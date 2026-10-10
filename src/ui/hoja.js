@@ -1,5 +1,5 @@
 // Hoja deslizable desde abajo para celular y tablet vertical.
-// Estados: "asomado" (se ve el encabezado de la ficha) y "abierto".
+// Estados: "asomado" (se ve el encabezado de la ficha), "abierto" y "oculto".
 import { reduceMovimiento } from '../core/estado.js';
 
 export const CONSULTA_HOJA = '(max-width: 719px), (orientation: portrait) and (max-width: 1024px)';
@@ -12,6 +12,7 @@ export class Hoja {
     this.alCambiar = alCambiar ?? (() => {});
     this.mq = window.matchMedia(CONSULTA_HOJA);
     this.estado = 'asomado';
+    this.asomado = ASOMADO;
     this.mq.addEventListener('change', () => this.#aplicar());
     this.#arrastre();
     this.#aplicar();
@@ -25,7 +26,14 @@ export class Hoja {
   /** Alto visible de la hoja (para que el mapa no quede tapado). */
   altoVisible() {
     if (!this.activa) return 0;
-    return this.estado === 'abierto' ? this.panel.offsetHeight : ASOMADO;
+    if (this.estado === 'oculto') return 0;
+    return this.estado === 'abierto' ? this.panel.offsetHeight : this.asomado;
+  }
+
+  /** Alto del estado asomado (null = valor por defecto). */
+  fijarAsomado(px) {
+    this.asomado = px ?? ASOMADO;
+    this.#aplicar();
   }
 
   poner(estado) {
@@ -38,7 +46,8 @@ export class Hoja {
   }
 
   #desplazamiento(estado = this.estado) {
-    return estado === 'abierto' ? 0 : Math.max(0, this.panel.offsetHeight - ASOMADO);
+    if (estado === 'oculto') return this.panel.offsetHeight + 20;
+    return estado === 'abierto' ? 0 : Math.max(0, this.panel.offsetHeight - this.asomado);
   }
 
   #aplicar(avisar = true) {

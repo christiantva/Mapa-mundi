@@ -4,6 +4,9 @@ import { cargar, guardar } from './almacen.js';
 const POR_DEFECTO = {
   visitados: [], // países con sello en el pasaporte
   ajustes: {
+    efectos: true,
+    musica: false,
+    voz: false,
     nombres: true,
     capitales: true,
     ecuador: false,

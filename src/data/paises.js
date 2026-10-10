@@ -230,6 +230,7 @@ export const PAISES = [
   {
     id: 'peru',
     nombre: 'Perú',
+    articulo: 'el', // en el Perú se dice "el Perú", "al Perú", "del Perú"
     nombreOficial: 'República del Perú',
     capitales: [{ nombre: 'Lima', lon: -77.03, lat: -12.05, rotulo: 'izq' }],
     poblacion: { texto: '34 millones', anio: 2024, fuente: 'Estimación INEI' }, // REVISAR: actualizar con resultados del Censo 2025
@@ -362,4 +363,10 @@ export function nombreDe(id) {
 }
 
 // Separador de miles con espacio fino, como recomienda la RAE (2 780 400).
+// Nombre con artículo para las frases de Kusi: "el Perú", "al Perú", "del Perú".
+const pais = (x) => (typeof x === 'string' ? PAISES_POR_ID[x] : x);
+export const elPais = (x) => { const p = pais(x); return p ? (p.articulo ? `el ${p.nombre}` : p.nombre) : nombreDe(x); };
+export const aPais = (x) => { const p = pais(x); return p?.articulo ? `al ${p.nombre}` : `a ${elPais(x)}`; };
+export const dePais = (x) => { const p = pais(x); return p?.articulo ? `del ${p.nombre}` : `de ${elPais(x)}`; };
+
 export const formatoMiles = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
