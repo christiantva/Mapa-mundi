@@ -2,6 +2,7 @@
 import { obtener, marcarVisitado, alCambiar } from '../core/estado.js';
 import { fichaPais, fichaBienvenida, dialogoBandera } from '../ui/ficha.js';
 import { PAISES_POR_ID, GUAYANA_FRANCESA, aPais } from '../data/paises.js';
+import { config } from '../core/config.js';
 
 export function crearExplorar(ctx) {
   const { mapa, hoja, contenido, app, kusi, sfx, confeti } = ctx;
@@ -20,7 +21,7 @@ export function crearExplorar(ctx) {
     actual = id;
     const p = PAISES_POR_ID[id];
     const nuevo = !!p && marcarVisitado(id);
-    contenido.innerHTML = fichaPais(id, { recienSellado: nuevo });
+    contenido.innerHTML = fichaPais(id, { recienSellado: nuevo, ciclo: config().ciclo });
     contenido.scrollTop = 0;
     if (hoja.activa && hoja.estado !== 'abierto') hoja.poner('asomado');
     mapa.seleccionar(id);
@@ -55,6 +56,7 @@ export function crearExplorar(ctx) {
   }
 
   return {
+    permite3D: true,
     titulo: 'Explorar con fichas',
     iniciar() {
       actual = null;

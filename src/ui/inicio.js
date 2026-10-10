@@ -1,5 +1,6 @@
 // Pantalla de inicio: Kusi saluda y el niño elige a qué jugar.
 import { SVG_KUSI } from './kusi.js';
+import { CICLOS, NIVELES } from '../core/config.js';
 
 const DIBUJOS = {
   explorar: `<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="10" y="8" width="44" height="50" rx="5" fill="#fff" stroke="#23302A" stroke-width="3"/><path d="M18 20h28M18 28h28M18 36h18" stroke="#5BA829" stroke-width="3.5" stroke-linecap="round"/><circle cx="44" cy="44" r="10" fill="#F2C230" stroke="#23302A" stroke-width="3"/><path d="M40 44.5l3 3 5-6" stroke="#23302A" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
@@ -24,6 +25,27 @@ export function htmlInicio() {
           <div class="inicio-kusi-dibujo kusi--saludo">${SVG_KUSI}</div>
         </div>
         <div class="inicio-menu">
+          <div class="selectores">
+            <div class="selector-grupo">
+              <h3 id="titulo-ciclo">¿En qué grado estás?</h3>
+              <div class="selector" role="radiogroup" aria-labelledby="titulo-ciclo">
+                ${Object.entries(CICLOS).map(([id, c]) => `
+                  <button type="button" class="selector-opcion" role="radio" aria-checked="false" data-ciclo="${id}">
+                    <strong>${c.grados}</strong><span>${c.nombre}</span>
+                  </button>`).join('')}
+              </div>
+            </div>
+            <div class="selector-grupo">
+              <h3 id="titulo-nivel">Nivel</h3>
+              <div class="selector" role="radiogroup" aria-labelledby="titulo-nivel">
+                ${Object.entries(NIVELES).map(([id, n]) => `
+                  <button type="button" class="selector-opcion" role="radio" aria-checked="false" data-nivel="${id}">
+                    <strong>${n.nombre}</strong>
+                  </button>`).join('')}
+              </div>
+            </div>
+            <p class="selector-ayuda js-ayuda-nivel"></p>
+          </div>
           <h2 id="inicio-titulo">¿A qué quieres jugar?</h2>
           <div class="tarjetas-modo">
             ${MODOS_INFO.map((m) => `
@@ -35,4 +57,11 @@ export function htmlInicio() {
         </div>
       </div>
     </section>`;
+}
+
+/** Marca la opción elegida de ciclo y nivel. */
+export function pintarSelectores(raiz, ciclo, nivel) {
+  for (const b of raiz.querySelectorAll('[data-ciclo]')) b.setAttribute('aria-checked', String(b.dataset.ciclo === ciclo));
+  for (const b of raiz.querySelectorAll('[data-nivel]')) b.setAttribute('aria-checked', String(b.dataset.nivel === nivel));
+  raiz.querySelector('.js-ayuda-nivel').textContent = `${CICLOS[ciclo].texto}. ${NIVELES[nivel].texto}.`;
 }

@@ -101,6 +101,7 @@ export class Kusi {
     this.el.innerHTML = `
       <div class="kusi-globo" role="status" aria-live="polite" hidden>
         <p class="kusi-texto"></p>
+        <button type="button" class="boton boton-primario kusi-accion" hidden></button>
         <button type="button" class="kusi-escuchar" aria-label="Escuchar a Kusi">${ICONOS.parlante}</button>
       </div>
       <button type="button" class="kusi-boton" aria-label="Kusi, tu guía. Toca para repetir lo que dijo.">${SVG_KUSI}</button>`;
@@ -143,9 +144,16 @@ export class Kusi {
   }
 
   /** Muestra un mensaje en el globo, lo lee si la voz está activa y anima a Kusi. */
-  decir(texto, estado = 'explicando', { fijo = false } = {}) {
+  decir(texto, estado = 'explicando', { fijo = false, accion = null } = {}) {
     this.ultimo = texto;
     this.texto.textContent = texto;
+    const b = this.el.querySelector('.kusi-accion');
+    b.hidden = !accion;
+    if (accion) {
+      b.textContent = accion.texto;
+      b.onclick = () => { b.hidden = true; this.ocultarGlobo(); accion.alHacer(); };
+      fijo = true;
+    }
     this.globo.hidden = false;
     this.globo.classList.remove('entra');
     void this.globo.offsetWidth;
@@ -161,7 +169,7 @@ export class Kusi {
     // En celular el globo tapa parte del mapa: siempre se esconde solo
     // (la pregunta sigue visible en la hoja de abajo).
     const movil = window.matchMedia(CONSULTA_HOJA).matches;
-    if (movil) this.tOcultar = setTimeout(() => this.ocultarGlobo(), Math.min(lectura + 1500, 6500));
+    if (movil && !accion) this.tOcultar = setTimeout(() => this.ocultarGlobo(), Math.min(lectura + 1500, 6500));
     else if (!fijo) this.tOcultar = setTimeout(() => this.ocultarGlobo(), lectura + 4500);
   }
 

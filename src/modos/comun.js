@@ -1,5 +1,4 @@
 // Piezas compartidas por los modos de juego.
-import { nombreDe } from '../data/paises.js';
 import { alAzar } from '../core/partida.js';
 import { ICONOS } from '../ui/iconos.js';
 
@@ -46,24 +45,4 @@ export function intentosHTML(usados, max = 3) {
 export function pistasHTML(pistas) {
   if (!pistas.length) return '';
   return `<ul class="pistas">${pistas.map((p) => `<li><span aria-hidden="true">${ICONOS.pista}</span>${esc(p)}</li>`).join('')}</ul>`;
-}
-
-/** Resumen al terminar una partida (la Fase 3 lo convierte en pantalla final con estrellas). */
-export function resumenHTML(titulo, r) {
-  const dificiles = r.dificiles.map((id) => `<span class="chip chip-fijo">${esc(nombreDe(id))}</span>`).join('');
-  return `
-    <section class="resumen">
-      <h2 class="ficha-nombre">¡Terminaste!</h2>
-      <p class="resumen-modo">${esc(titulo)}</p>
-      <dl class="resumen-datos">
-        <div><dt>Aciertos al primer intento</dt><dd><strong>${r.aciertos}</strong> de ${r.total}</dd></div>
-        <div><dt>Tiempo</dt><dd><strong>${formatoTiempo(r.segundos)}</strong></dd></div>
-      </dl>
-      ${r.dificiles.length ? `<p class="etiqueta-mini">Te costaron más:</p><div class="chips">${dificiles}</div>` : '<p class="resumen-perfecto">¡No te equivocaste ni una vez!</p>'}
-      <div class="resumen-botones">
-        ${r.dificiles.length ? '<button type="button" class="boton boton-primario" data-resumen="practicar">Practicar estos países</button>' : ''}
-        <button type="button" class="boton ${r.dificiles.length ? 'boton-secundario' : 'boton-primario'}" data-resumen="otra">${ICONOS.repetir} Jugar otra vez</button>
-        <button type="button" class="boton boton-secundario" data-resumen="inicio">${ICONOS.casa} Elegir otro juego</button>
-      </div>
-    </section>`;
 }

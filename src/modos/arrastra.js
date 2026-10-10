@@ -6,6 +6,7 @@ import { Partida, barajar } from '../core/partida.js';
 import { bandera } from '../ui/banderas.js';
 import { cabeceraModo, felicitar, temporizadores, esc } from './comun.js';
 import { reduceMovimiento } from '../core/estado.js';
+import { config } from '../core/config.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const MAX_ERRORES = 3;
@@ -13,6 +14,7 @@ const MAX_ERRORES = 3;
 export function crearArrastra(ctx, { ids } = {}) {
   const { mapa, kusi, sfx, confeti, contenido, hoja, zonaMapa } = ctx;
   const titulo = 'Arrastra la bandera';
+  const cfg = config();
   const t = temporizadores();
   let partida, bandeja, elegida = null, arrastre = null;
   const colocadas = [];
@@ -23,9 +25,10 @@ export function crearArrastra(ctx, { ids } = {}) {
       <div class="juego">
         ${cabeceraModo(titulo)}
         <p class="pregunta">Arrastra cada bandera hasta su país.</p>
+        ${cfg.limite ? `<p class="juego-ayuda">Tienes ${cfg.limite} segundos para cada bandera.</p>` : ''}
         <p class="juego-ayuda">También puedes tocar una bandera y después tocar el país.</p>
         <p class="juego-quedan"><strong>${quedan}</strong> ${quedan === 1 ? 'bandera por colocar' : 'banderas por colocar'}</p>
-        ${mensaje ? `<p class="aviso">${mensaje}</p>` : ''}
+        ${mensaje ? `<p class="aviso"><span>${mensaje}</span></p>` : ''}
       </div>`;
   }
 
@@ -162,9 +165,12 @@ export function crearArrastra(ctx, { ids } = {}) {
       t.despues(900, () => colocar(idBandera, item, null, false));
       return;
     }
-    if (n === 1) kusi.decir(`Esa no es la bandera ${idPais === GUAYANA_FRANCESA.id ? 'de la Guayana Francesa' : dePais(idPais)}. Pista: ${p.pistas[0]}`, 'pensando', { fijo: true });
+    const noEs = `Esa no es la bandera ${idPais === GUAYANA_FRANCESA.id ? 'de la Guayana Francesa' : dePais(idPais)}.`;
+    if (cfg.pistas === 'no') kusi.decir(`${noEs} ¡Intenta otra vez!`, 'pensando', { fijo: true });
+    else if (n === 1 && cfg.pistas === 'auto') kusi.decir(`${noEs} Pista: ${p.pistas[0]}`, 'pensando', { fijo: true });
+    else if (n === 1) kusi.decir(`${noEs} ¡Intenta otra vez!`, 'pensando', { fijo: true });
     else kusi.decir(`Es la bandera ${dePais(p)}. ¡Búscalo en el mapa!`, 'pensando', { fijo: true });
-    pintarPanel(n === 2 ? `Esa bandera es ${p.articulo ? 'del' : 'de'} <strong>${esc(p.nombre)}</strong>.` : '');
+    pintarPanel(n === 2 && cfg.pistas !== 'no' ? `Esa bandera es ${p.articulo ? 'del' : 'de'} <strong>${esc(p.nombre)}</strong>.` : '');
   }
 
   function colocar(id, item, fantasma, acerto = true) {
@@ -189,16 +195,22 @@ export function crearArrastra(ctx, { ids } = {}) {
       g.firstChild.append(document.importNode(svg, true));
       mapa.agregarRotulo(g, lon, lat, { capa: 'rotulos' });
       colocadas.push(g);
+      mapa.refrescarRotulos();
       mapa.animarAcierto(id);
       if (acerto) {
         sfx.acierto();
         confeti.lanzar({ x: destino?.[0], y: destino?.[1], cantidad: 50 });
-        kusi.decir(`${felicitar()} Esa es la bandera ${dePais(id)}.`, 'celebrando');
+        const p = PAISES_POR_ID[id];
+        const extra = cfg.ciclo === 'IV' ? ` Su capital es ${p.capitales[0].nombre}.` : cfg.ciclo === 'V' ? ` ${p.bandera.descripcion}` : '';
+        kusi.decir(`${felicitar()} Esa es la bandera ${dePais(id)}.${extra}`, 'celebrando');
       }
       ctx.progreso.poner(partida.resueltos.length, partida.total, 'banderas');
       pintarPanel();
       ctx.actualizarAbajo();
-      if (partida.resueltos.length === partida.total) t.despues(1400, terminar);
+      if (partida.resueltos.length === partida.total) {
+        ctx.reloj.detener();
+        t.despues(1400, terminar);
+      } else if (cfg.limite) ctx.reloj.cuentaRegresiva(cfg.limite, sinTiempo);
     };
 
     if (!fantasma || !destino || reduceMovimiento()) { poner(); return; }
@@ -222,8 +234,22 @@ export function crearArrastra(ctx, { ids } = {}) {
     else intentar(b, id);
   }
 
+  // Se acabó el tiempo para esta bandera: Kusi la coloca y seguimos.
+  function sinTiempo() {
+    if (!bandeja) return;
+    const item = (elegida && bandeja.querySelector(`[data-bandera="${elegida}"]`)) || bandeja.querySelector('.bandeja-item');
+    if (!item) return;
+    if (arrastre) cancelarArrastre();
+    elegir(null);
+    const id = item.dataset.bandera;
+    while (partida.erroresDe(id) < MAX_ERRORES) partida.error(id);
+    sfx.error();
+    kusi.decir(`¡Se acabó el tiempo! Esta es la bandera ${dePais(id)}.`, 'explicando');
+    colocar(id, item, null, false);
+  }
+
   function terminar() {
-    ctx.terminar(titulo, partida.resumen(), (repetir) => crearArrastra(ctx, { ids: repetir }));
+    ctx.terminar('arrastra', titulo, partida.resumen(), (repetir) => crearArrastra(ctx, { ids: repetir }));
   }
 
   return {
@@ -232,7 +258,7 @@ export function crearArrastra(ctx, { ids } = {}) {
       const lista = ids ?? PAISES.map((p) => p.id);
       partida = new Partida(lista);
       mapa.setVisitados([]);
-      mapa.setJuego({ nombres: () => true, capitales: false });
+      mapa.setJuego({ nombres: (id) => cfg.nombres || partida.resueltos.includes(id), capitales: false });
       mapa.alSeleccionar = tocarPais;
       mapa.seleccionar(null);
       crearBandeja(barajar(lista));
@@ -240,10 +266,12 @@ export function crearArrastra(ctx, { ids } = {}) {
       mapa.centrar();
       ctx.progreso.poner(0, partida.total, 'banderas');
       pintarPanel();
-      kusi.decir('Arrastra cada bandera hasta su país. ¡Tú puedes!', 'saludo');
+      kusi.decir(cfg.ciclo === 'III' ? '¡Lleva cada bandera a su país!' : 'Arrastra cada bandera hasta su país. ¡Tú puedes!', 'saludo');
+      if (cfg.limite) ctx.reloj.cuentaRegresiva(cfg.limite, sinTiempo);
     },
     detener() {
       t.limpiar();
+      ctx.reloj.detener();
       if (arrastre) cancelarArrastre();
       document.querySelectorAll('.bandera-fantasma').forEach((f) => f.remove());
       bandeja?.remove();

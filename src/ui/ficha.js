@@ -37,7 +37,7 @@ export function fichaBienvenida(visitados) {
     </div>`;
 }
 
-export function fichaPais(id, { recienSellado = false } = {}) {
+export function fichaPais(id, { recienSellado = false, ciclo = 'V' } = {}) {
   if (id === GUAYANA_FRANCESA.id) return fichaTerritorio();
   const p = PAISES_POR_ID[id];
   if (!p) return '';
@@ -53,6 +53,10 @@ export function fichaPais(id, { recienSellado = false } = {}) {
   const mar = p.oceanos.length
     ? `Océano ${lista(p.oceanos.map(esc))}`
     : '<strong>No tiene mar.</strong> Está rodeado de otros países.';
+  const III = ciclo === 'III', V = ciclo === 'V';
+  // En III ciclo los textos son muy cortos: solo la primera oración.
+  const descripcion = III ? (p.descripcion.match(/^[^.!?]*[.!?]/)?.[0] ?? p.descripcion) : p.descripcion;
+  const vecinoPeru = p.id !== 'peru' && p.limitrofes.includes('peru');
 
   return `
     <article class="ficha" aria-labelledby="ficha-titulo">
@@ -75,18 +79,25 @@ export function fichaPais(id, { recienSellado = false } = {}) {
 
       <p class="ficha-capital-corta"><span aria-hidden="true">${ICONOS.capital}</span> Capital: ${p.capitales.map((c) => `<strong>${esc(c.nombre)}</strong>`).join(' y ')}</p>
 
-      <p class="ficha-descripcion">${esc(p.descripcion)}</p>
+      <p class="ficha-descripcion">${esc(descripcion)}</p>
 
-      ${p.notaCapital ? `<aside class="nota nota-capital"><span aria-hidden="true">${ICONOS.info}</span><p>${esc(p.notaCapital)}</p></aside>` : ''}
+      ${vecinoPeru && !III ? `<p class="insignia-vecino">${ICONOS.vecinos} Es vecino del Perú</p>` : ''}
 
+      ${p.notaCapital && !III ? `<aside class="nota nota-capital"><span aria-hidden="true">${ICONOS.info}</span><p>${esc(p.notaCapital)}</p></aside>` : ''}
+
+      ${III ? `
+      <section class="ficha-seccion">
+        <h3>Sus vecinos</h3>
+        <div class="chips">${vecinos}</div>
+      </section>` : `
       <section class="ficha-seccion">
         <h3>Datos</h3>
         <dl class="datos">
           ${fila('capital', p.capitales.length > 1 ? 'Capitales' : 'Capital', capitales)}
           ${fila('personas', 'Población', `${esc(p.poblacion.texto)} de habitantes <span class="fuente">(${p.poblacion.anio})</span>`)}
           ${fila('superficie', 'Superficie', `${formatoMiles(p.superficie)} km²`)}
-          ${fila('idioma', p.idiomas.length > 1 ? 'Idiomas oficiales' : 'Idioma oficial', esc(lista(p.idiomas)))}
-          ${fila('moneda', 'Moneda', esc(p.moneda))}
+          ${V ? fila('idioma', p.idiomas.length > 1 ? 'Idiomas oficiales' : 'Idioma oficial', esc(lista(p.idiomas))) : ''}
+          ${V ? fila('moneda', 'Moneda', esc(p.moneda)) : ''}
         </dl>
       </section>
 
@@ -101,9 +112,10 @@ export function fichaPais(id, { recienSellado = false } = {}) {
         <h3>Naturaleza</h3>
         <p class="etiqueta-mini">Regiones naturales:</p>
         <ul class="regiones">${p.regiones.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
-        <p class="ficha-relieve"><span aria-hidden="true">${ICONOS.montana}</span> ${esc(p.relieve)}</p>
-      </section>
+        ${V ? `<p class="ficha-relieve"><span aria-hidden="true">${ICONOS.montana}</span> ${esc(p.relieve)}</p>` : ''}
+      </section>`}
 
+      ${V ? `
       <section class="ficha-seccion">
         <h3>Cultura</h3>
         <ul class="culturas">
@@ -112,14 +124,16 @@ export function fichaPais(id, { recienSellado = false } = {}) {
           ${tarjeta('lugar', 'Lugar famoso', p.lugar)}
           ${tarjeta('fiesta', 'Fiesta o tradición', p.fiesta)}
         </ul>
-      </section>
+      </section>` : `
+      <ul class="culturas">${tarjeta('animal', 'Animal emblemático', p.animal)}${III ? '' : tarjeta('lugar', 'Lugar famoso', p.lugar)}</ul>`}
 
+      ${III ? '' : `
       <aside class="dato-curioso">
         <span class="dato-icono" aria-hidden="true">${ICONOS.foco}</span>
         <div><strong>¿Sabías que…?</strong><p>${esc(p.datoCurioso)}</p></div>
-      </aside>
+      </aside>`}
 
-      ${p.notaExtra ? `<aside class="nota"><span aria-hidden="true">${ICONOS.info}</span><p>${esc(p.notaExtra)}</p></aside>` : ''}
+      ${p.notaExtra && V ? `<aside class="nota"><span aria-hidden="true">${ICONOS.info}</span><p>${esc(p.notaExtra)}</p></aside>` : ''}
     </article>`;
 }
 
