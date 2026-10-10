@@ -1,7 +1,7 @@
 // Modo 4: Arrastra la bandera. Las banderas están en una bandeja; el niño las
 // arrastra hasta su país. También se puede tocar una bandera y luego el país
 // (o usar Tab + Enter con el teclado).
-import { PAISES, PAISES_POR_ID, GUAYANA_FRANCESA, elPais, dePais } from '../data/paises.js';
+import { PAISES, PAISES_POR_ID, GUAYANA_FRANCESA, dePais } from '../data/paises.js';
 import { Partida, barajar } from '../core/partida.js';
 import { bandera } from '../ui/banderas.js';
 import { cabeceraModo, felicitar, temporizadores, esc } from './comun.js';
@@ -159,7 +159,6 @@ export function crearArrastra(ctx, { ids } = {}) {
     mapa.animarError(idPais);
     if (a) volverABandeja(a);
     const p = PAISES_POR_ID[idBandera];
-    const tocado = idPais === GUAYANA_FRANCESA.id ? 'la Guayana Francesa' : elPais(idPais);
     if (n >= MAX_ERRORES) {
       kusi.decir(`Mira, esta es la bandera ${dePais(p)}. ¡La pongo en su lugar!`, 'explicando');
       t.despues(900, () => colocar(idBandera, item, null, false));

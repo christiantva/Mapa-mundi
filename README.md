@@ -51,7 +51,7 @@ Los datos que no se pudieron verificar con fuente oficial están marcados con
 | 1 | Mapa 2D, modo Explorar, datos completos de los 12 países, banderas SVG | ✅ |
 | 2 | Modos Encuentra el país, Avión viajero y Arrastra la bandera; Kusi; sonidos y voz | ✅ |
 | 3 | Globo 3D (Three.js), ciclo + nivel, pasaporte, estrellas, pantalla final, modo docente | ✅ |
-| 4 | Build final, pruebas en móvil y escritorio, peso final | pendiente |
+| 4 | Build final, pruebas en móvil y escritorio, peso final | ✅ |
 
 ## Ciclo y nivel
 
@@ -73,3 +73,28 @@ pregunta pasa 25 s (fácil), 18 s (medio) o 10 s (difícil).
 
 **Modo docente:** mantener presionado el logo 3 segundos (o Enter sostenido).
 Muestra los resultados de la sesión, permite copiarlos y reiniciar todo el progreso.
+
+## Archivo final
+
+`dist/index.html` es el juego completo en un solo archivo: **1083 KB** (1,06 MB;
+362 KB comprimido con gzip). Funciona abriéndolo con doble clic, sin internet.
+
+| Parte | Peso aprox. |
+|---|---|
+| Three.js (globo 3D) | 524 KB |
+| Código del juego (JS) | 138 KB |
+| Mapa de Sudamérica (Natural Earth 1:50m) | 103 KB |
+| Mapa mundial para el globo (1:110m) | 100 KB |
+| D3 + TopoJSON | 77 KB |
+| Estilos + fuente Nunito incrustada | ~140 KB |
+
+## Pruebas realizadas (Fase 4)
+
+- Celular vertical (Pixel 7) y horizontal (iPhone 12), tablet vertical y horizontal
+  (iPad), PC 1366×768 y pizarra 1920×1080: sin errores en consola, sin desborde
+  horizontal y con botones de al menos 44 px (los principales, 56 px).
+- Sin red: se bloquearon todos los pedidos externos y el juego funcionó igual.
+- Accesibilidad con axe-core (contraste, nombres, estructura), recorrido con teclado
+  y modo "reducir movimiento".
+- Fluidez: el vuelo del avión va a 60 FPS; el zoom del mapa, a ~55 FPS incluso
+  sin tarjeta de video.

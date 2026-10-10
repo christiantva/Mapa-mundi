@@ -38,7 +38,7 @@ app.innerHTML = `
       <span class="barra-modo js-nombre-modo"></span>
     </div>
     <div class="barra-acciones">
-      <button type="button" class="pasaporte-mini js-pasaporte" aria-label="Abrir mi pasaporte">${ICONOS.pasaporte}<span><span class="js-sellos">0</span>/12</span></button>
+      <button type="button" class="pasaporte-mini js-pasaporte">${ICONOS.pasaporte}<span><span class="visualmente-oculto">Pasaporte: </span><span class="js-sellos">0</span>/12<span class="visualmente-oculto"> sellos</span></span></button>
       <button type="button" class="boton-barra js-boton-inicio" aria-label="Volver al inicio" hidden>${ICONOS.casa}<span>Inicio</span></button>
     </div>
   </header>
@@ -145,8 +145,15 @@ const mapa = new Mapa2D($('.mapa-contenedor'), {
 
 const kusi = new Kusi(panel);
 // En escritorio Kusi vive al pie del panel; en celular flota sobre el mapa.
-const ubicarKusi = () => (hoja.activa ? escenario : panel).append(kusi.el);
+// En pantallas bajas (celular horizontal) también flota, para no tapar el panel.
+const mqBaja = window.matchMedia('(max-height: 520px)');
+const ubicarKusi = () => {
+  const flotante = hoja.activa || mqBaja.matches;
+  (flotante ? escenario : panel).append(kusi.el);
+  kusi.el.classList.toggle('kusi-flotante', flotante);
+};
 hoja.mq.addEventListener('change', ubicarKusi);
+mqBaja.addEventListener('change', ubicarKusi);
 ubicarKusi();
 const confeti = new Confeti(zonaMapa);
 const confetiFinal = new Confeti(pantallaFinal);

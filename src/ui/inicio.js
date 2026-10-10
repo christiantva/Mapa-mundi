@@ -27,7 +27,7 @@ export function htmlInicio() {
         <div class="inicio-menu">
           <div class="selectores">
             <div class="selector-grupo">
-              <h3 id="titulo-ciclo">¿En qué grado estás?</h3>
+              <p class="selector-titulo" id="titulo-ciclo">¿En qué grado estás?</p>
               <div class="selector" role="radiogroup" aria-labelledby="titulo-ciclo">
                 ${Object.entries(CICLOS).map(([id, c]) => `
                   <button type="button" class="selector-opcion" role="radio" aria-checked="false" data-ciclo="${id}">
@@ -36,7 +36,7 @@ export function htmlInicio() {
               </div>
             </div>
             <div class="selector-grupo">
-              <h3 id="titulo-nivel">Nivel</h3>
+              <p class="selector-titulo" id="titulo-nivel">Nivel</p>
               <div class="selector" role="radiogroup" aria-labelledby="titulo-nivel">
                 ${Object.entries(NIVELES).map(([id, n]) => `
                   <button type="button" class="selector-opcion" role="radio" aria-checked="false" data-nivel="${id}">

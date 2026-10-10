@@ -12,10 +12,10 @@ const lista = (items) => {
 };
 
 const fila = (icono, etiqueta, valor) => `
-  <div class="dato">
+  <li class="dato">
     <span class="dato-icono" aria-hidden="true">${ICONOS[icono]}</span>
-    <div><dt>${etiqueta}</dt><dd>${valor}</dd></div>
-  </div>`;
+    <div><span class="dato-etiqueta">${etiqueta}</span><span class="dato-valor">${valor}</span></div>
+  </li>`;
 
 const tarjeta = (icono, titulo, item) => `
   <li class="cultura">
@@ -92,13 +92,13 @@ export function fichaPais(id, { recienSellado = false, ciclo = 'V' } = {}) {
       </section>` : `
       <section class="ficha-seccion">
         <h3>Datos</h3>
-        <dl class="datos">
+        <ul class="datos">
           ${fila('capital', p.capitales.length > 1 ? 'Capitales' : 'Capital', capitales)}
           ${fila('personas', 'Población', `${esc(p.poblacion.texto)} de habitantes <span class="fuente">(${p.poblacion.anio})</span>`)}
           ${fila('superficie', 'Superficie', `${formatoMiles(p.superficie)} km²`)}
           ${V ? fila('idioma', p.idiomas.length > 1 ? 'Idiomas oficiales' : 'Idioma oficial', esc(lista(p.idiomas))) : ''}
           ${V ? fila('moneda', 'Moneda', esc(p.moneda)) : ''}
-        </dl>
+        </ul>
       </section>
 
       <section class="ficha-seccion">
@@ -157,12 +157,12 @@ function fichaTerritorio() {
       <p class="ficha-descripcion">${g.descripcion}</p>
       <section class="ficha-seccion">
         <h3>Datos</h3>
-        <dl class="datos">
+        <ul class="datos">
           ${fila('capital', 'Ciudad principal', `<strong>${g.capitales[0].nombre}</strong>`)}
           ${fila('idioma', 'Idioma', 'francés')}
           ${fila('moneda', 'Moneda', 'euro')}
           ${fila('vecinos', 'Limita con', 'Brasil y Surinam')}
-        </dl>
+        </ul>
       </section>
     </article>`;
 }

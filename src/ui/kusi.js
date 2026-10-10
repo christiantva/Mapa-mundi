@@ -2,7 +2,6 @@
 // Estados: saludo, explicando, celebrando, pensando, durmiendo (y normal).
 import { decir as hablar, callar } from '../core/voz.js';
 import { ICONOS } from './iconos.js';
-import { CONSULTA_HOJA } from './hoja.js';
 
 const PIEL = '#C98B4F';
 const PIEL_OSCURA = '#A86E39';
@@ -168,7 +167,7 @@ export class Kusi {
     }
     // En celular el globo tapa parte del mapa: siempre se esconde solo
     // (la pregunta sigue visible en la hoja de abajo).
-    const movil = window.matchMedia(CONSULTA_HOJA).matches;
+    const movil = this.el.classList.contains('kusi-flotante');
     if (movil && !accion) this.tOcultar = setTimeout(() => this.ocultarGlobo(), Math.min(lectura + 1500, 6500));
     else if (!fijo) this.tOcultar = setTimeout(() => this.ocultarGlobo(), lectura + 4500);
   }

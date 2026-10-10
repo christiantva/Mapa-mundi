@@ -18,6 +18,7 @@
   "homepage": "https://github.com/christiantva/Mapa-mundi#readme",
   "devDependencies": {
     "@fontsource-variable/nunito": "^5.3.0",
+    "axe-core": "^4.14.0",
     "d3-geo": "^3.1.1",
     "d3-interpolate": "^3.0.1",
     "d3-selection": "^3.0.0",

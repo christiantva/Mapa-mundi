@@ -214,6 +214,9 @@ export class Mapa2D {
     this.zoom = d3zoom()
       .scaleExtent([1, ZOOM_MAX])
       .filter((e) => (!e.ctrlKey || e.type === 'wheel') && !e.button)
+      // Mientras el mapa se mueve quitamos las sombras (filtros SVG caros de repintar)
+      .on('start', () => this.svg.classList.add('moviendo'))
+      .on('end', () => this.svg.classList.remove('moviendo'))
       .on('zoom', (e) => {
         this.transform = e.transform;
         this.gZoom.setAttribute('transform', e.transform.toString());
@@ -294,16 +297,18 @@ export class Mapa2D {
   #ubicarRotulos() {
     const t = this.transform;
     const k = t.k;
+    // Los nombres de las capitales aparecen al acercarse
+    if ((k >= 2.4) !== this.svg.classList.contains('zoom-cerca')) this.svg.classList.toggle('zoom-cerca', k >= 2.4);
     for (const r of this.rotulos) {
       if (!r.xy) continue;
       const x = t.applyX(r.xy[0]), y = t.applyY(r.xy[1]);
       r.el.setAttribute('transform', `translate(${x.toFixed(1)},${y.toFixed(1)})${r.giro ? ` rotate(${r.giro})` : ''}`);
-      const oculto = (r.zoomMin && k < r.zoomMin) || this.#ocultoPorOpcion(r, k);
+      const oculto = (r.zoomMin && k < r.zoomMin) || this.#ocultoPorOpcion(r);
       r.el.classList.toggle('oculto', !!oculto);
     }
   }
 
-  #ocultoPorOpcion(r, k) {
+  #ocultoPorOpcion(r) {
     const o = this.opciones;
     if (r.tipo === 'ecuador') return !o.ecuador;
     if (r.tipo === 'tropico') return !o.tropico;
