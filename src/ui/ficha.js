@@ -2,13 +2,17 @@
 // tablet vertical es una hoja deslizable desde abajo (ver hoja.js).
 import { PAISES_POR_ID, GUAYANA_FRANCESA, nombreDe, formatoMiles } from '../data/paises.js';
 import { bandera } from './banderas.js';
+import { FUENTES } from '../data/fuentes.js';
 import { ICONOS } from './iconos.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 const lista = (items) => {
   if (items.length <= 1) return items.join('');
-  return `${items.slice(0, -1).join(', ')} y ${items.at(-1)}`;
+  const ultimo = items.at(-1);
+  // Si el último ya empieza con "y" (por ejemplo "y otras lenguas"), no lo repetimos
+  const union = /^y /.test(ultimo) ? ' ' : ' y ';
+  return `${items.slice(0, -1).join(', ')}${union}${ultimo}`;
 };
 
 const fila = (icono, etiqueta, valor) => `
@@ -22,6 +26,17 @@ const tarjeta = (icono, titulo, item) => `
     <span class="dato-icono" aria-hidden="true">${ICONOS[icono]}</span>
     <div><span class="cultura-tipo">${titulo}</span><strong>${esc(item.nombre)}</strong><p>${esc(item.detalle)}</p></div>
   </li>`;
+
+// Fuentes verificadas de cada dato (para el docente)
+function fuentesHTML(p) {
+  const lista = FUENTES[p.id] ?? [];
+  if (!lista.length) return '';
+  return `
+    <details class="fuentes">
+      <summary>Fuentes de estos datos</summary>
+      <ul>${lista.map((f) => `<li><strong>${esc(f.dato)}:</strong> ${esc(f.fuente)}. <a href="${esc(f.url)}" target="_blank" rel="noopener noreferrer">Ver fuente</a></li>`).join('')}</ul>
+    </details>`;
+}
 
 export function fichaBienvenida(visitados) {
   return `
@@ -120,12 +135,12 @@ export function fichaPais(id, { recienSellado = false, ciclo = 'V' } = {}) {
         <h3>Cultura</h3>
         <ul class="culturas">
           ${tarjeta('plato', 'Plato típico', p.plato)}
-          ${tarjeta('animal', 'Animal emblemático', p.animal)}
+          ${tarjeta('animal', 'Animal representativo', p.animal)}
           ${tarjeta('lugar', 'Lugar famoso', p.lugar)}
           ${tarjeta('fiesta', 'Fiesta o tradición', p.fiesta)}
         </ul>
       </section>` : `
-      <ul class="culturas">${tarjeta('animal', 'Animal emblemático', p.animal)}${III ? '' : tarjeta('lugar', 'Lugar famoso', p.lugar)}</ul>`}
+      <ul class="culturas">${tarjeta('animal', 'Animal representativo', p.animal)}${III ? '' : tarjeta('lugar', 'Lugar famoso', p.lugar)}</ul>`}
 
       ${III ? '' : `
       <aside class="dato-curioso">
@@ -134,6 +149,8 @@ export function fichaPais(id, { recienSellado = false, ciclo = 'V' } = {}) {
       </aside>`}
 
       ${p.notaExtra && V ? `<aside class="nota"><span aria-hidden="true">${ICONOS.info}</span><p>${esc(p.notaExtra)}</p></aside>` : ''}
+
+      ${fuentesHTML(p)}
     </article>`;
 }
 

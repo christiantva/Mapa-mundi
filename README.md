@@ -41,8 +41,11 @@ src/
   styles/main.css   estilos (paleta de cuaderno de viaje, Nunito incrustada)
 ```
 
-Los datos que no se pudieron verificar con fuente oficial están marcados con
-`// REVISAR` en `src/data/paises.js`.
+Todos los datos de los países fueron verificados con fuentes reales (Fase 5):
+institutos de estadística, constituciones, listas de la UNESCO, CIA World Factbook
+y enciclopedias. Las fuentes por dato están en `src/data/fuentes.js`, se ven en el
+juego al final de cada ficha, y el informe completo está en
+[`docs/investigacion-datos.md`](docs/investigacion-datos.md).
 
 ## Plan por fases
 
@@ -52,6 +55,7 @@ Los datos que no se pudieron verificar con fuente oficial están marcados con
 | 2 | Modos Encuentra el país, Avión viajero y Arrastra la bandera; Kusi; sonidos y voz | ✅ |
 | 3 | Globo 3D (Three.js), ciclo + nivel, pasaporte, estrellas, pantalla final, modo docente | ✅ |
 | 4 | Build final, pruebas en móvil y escritorio, peso final | ✅ |
+| 5 | Investigación y verificación de todos los datos con fuentes reales | ✅ |
 
 ## Ciclo y nivel
 
@@ -76,8 +80,8 @@ Muestra los resultados de la sesión, permite copiarlos y reiniciar todo el prog
 
 ## Archivo final
 
-`dist/index.html` es el juego completo en un solo archivo: **1083 KB** (1,06 MB;
-362 KB comprimido con gzip). Funciona abriéndolo con doble clic, sin internet.
+`dist/index.html` es el juego completo en un solo archivo: **1099 KB** (1,07 MB;
+unos 369 KB comprimido con gzip). Funciona abriéndolo con doble clic, sin internet.
 
 | Parte | Peso aprox. |
 |---|---|

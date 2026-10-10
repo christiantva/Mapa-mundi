@@ -1201,3 +1201,9 @@ button.pasaporte-mini:hover { border-color: rgba(255, 255, 255, 0.6); }
   .opcion-icono { font-size: 1rem; }
   .intento { width: 1.7rem; height: 1.7rem; }
 }
+
+/* Fuentes de los datos (al final de cada ficha) */
+.fuentes { border-top: 2px dashed var(--linea); padding-top: 0.6rem; font-size: 0.95rem; color: var(--texto-suave); }
+.fuentes summary { cursor: pointer; font-weight: 800; min-height: 44px; display: flex; align-items: center; }
+.fuentes ul { margin: 0.3rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.35rem; }
+.fuentes a { color: var(--oceano-texto); font-weight: 700; }
