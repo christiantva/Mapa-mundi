@@ -25,6 +25,22 @@ export function temporizadores() {
   };
 }
 
+/**
+ * Reemplaza el contenido del panel sin perder el foco del teclado: si el foco
+ * estaba en el panel, vuelve al mismo botón (o al primero disponible).
+ */
+export function reemplazarPanel(contenido, html) {
+  const activo = document.activeElement;
+  const teniaFoco = activo && activo !== contenido && contenido.contains(activo);
+  const { opcion, accion } = (teniaFoco && activo.dataset) || {};
+  contenido.innerHTML = html;
+  if (!teniaFoco) return;
+  const mismo = opcion != null ? contenido.querySelector(`[data-opcion="${CSS.escape(opcion)}"]`)
+    : accion ? contenido.querySelector(`[data-accion="${CSS.escape(accion)}"]`) : null;
+  const destino = (mismo && !mismo.disabled ? mismo : null) ?? contenido.querySelector('button:not([disabled])');
+  destino?.focus({ preventScroll: true });
+}
+
 export function cabeceraModo(titulo, numero, total) {
   return `
     <header class="modo-cabecera">

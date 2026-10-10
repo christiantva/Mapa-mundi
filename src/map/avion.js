@@ -82,6 +82,8 @@ export class Avion {
 
   /** Vuela hasta [lon, lat] dejando una ruta punteada. Devuelve una promesa. */
   volar(destino) {
+    // Si está dando una vuelta (respuesta equivocada), primero la termina
+    if (this.vuelta) return this.vuelta.then(() => this.volar(destino));
     const ruta = { a: this.pos, b: destino };
     const c = this.#curva(ruta.a, ruta.b);
     const duracion = Math.min(3200, Math.max(1500, c.largo * 5));
@@ -106,6 +108,7 @@ export class Avion {
       if (reduceMovimiento()) { terminar(); return; }
       const t0 = performance.now();
       const cuadro = (ahora) => {
+        if (this.destruido) { resolver(duracion); return; }
         const lineal = Math.min(1, (ahora - t0) / duracion);
         const t = facil(lineal);
         this.altura = Math.sin(lineal * Math.PI);
@@ -121,13 +124,15 @@ export class Avion {
 
   /** Da una vuelta en el aire (cuando el niño se equivoca). */
   darVuelta() {
+    if (this.vuelta) return this.vuelta; // ya está dando una
     const radio = 30, duracion = 1300;
     const xy = this.mapa.proyectar(...this.pos);
-    return new Promise((resolver) => {
+    this.vuelta = new Promise((resolver) => {
       if (reduceMovimiento()) { resolver(); return; }
       this.volando = true;
       const t0 = performance.now();
       const cuadro = (ahora) => {
+        if (this.destruido) { resolver(); return; }
         const l = Math.min(1, (ahora - t0) / duracion);
         const th = Math.PI / 2 - facil(l) * Math.PI * 2; // empieza abajo y gira
         this.offsetPantalla = [radio * Math.cos(th), radio * Math.sin(th) - radio];
@@ -144,10 +149,12 @@ export class Avion {
         }
       };
       requestAnimationFrame(cuadro);
-    });
+    }).finally(() => { this.vuelta = null; });
+    return this.vuelta;
   }
 
   destruir() {
+    this.destruido = true;
     this.quitarZoom();
     this.mapa.alRedimensionar.delete(this.#redibujarRutas);
     this.g.remove();

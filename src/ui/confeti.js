@@ -19,7 +19,7 @@ export class Confeti {
     if (reduceMovimiento()) return;
     const r = this.canvas.getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    if (this.canvas.width !== Math.round(r.width * dpr)) {
+    if (this.canvas.width !== Math.round(r.width * dpr) || this.canvas.height !== Math.round(r.height * dpr)) {
       this.canvas.width = Math.round(r.width * dpr);
       this.canvas.height = Math.round(r.height * dpr);
     }

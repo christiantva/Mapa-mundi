@@ -9,11 +9,12 @@ import { htmlInicio, pintarSelectores } from './ui/inicio.js';
 import { htmlFinal } from './ui/final.js';
 import { htmlPasaporte } from './ui/pasaporte.js';
 import { htmlDocente, textoDocente } from './ui/docente.js';
+import { abrirDialogo, cerrarDialogo, toqueFuera } from './ui/dialogo.js';
 import { obtener, alCambiar, cambiarAjuste, actualizar, registrarEstrellas, reiniciarTodo } from './core/estado.js';
 import { config, calcularEstrellas } from './core/config.js';
 import { registrarPartida, partidasSesion, limpiarSesion } from './core/sesion.js';
 import { desbloquear, configurar as configurarSonido, efectos as sfx } from './core/sonido.js';
-import { activarVoz, decir, vozDisponible, callar } from './core/voz.js';
+import { activarVoz, decir, vozDisponible, callar, desbloquearVoz } from './core/voz.js';
 import { PAISES_POR_ID } from './data/paises.js';
 import { crearExplorar } from './modos/explorar.js';
 import { crearEncuentra } from './modos/encuentra.js';
@@ -161,25 +162,65 @@ actualizarAbajo();
 
 // ───── Globo 3D (si el equipo tiene WebGL) ─────
 let vista = '2d';
+let cargandoGlobo = false;
+let ultimoCambioVista = 0;
 const botonVista = $('[data-accion="vista"]');
-function cambiarVista(nueva) {
-  if (!globo && nueva === '3d') {
-    try {
-      globo = new Globo3D($('.globo-contenedor'), {
-        alSeleccionar: (id) => mapa.alSeleccionar(id, { origen: 'globo' }),
-        margenAbajo: () => (hoja.activa ? hoja.altoVisible() : 0) + 20,
-        alLento: () => kusi.decir('Tu equipo va un poco lento con el globo. ¿Volvemos al mapa 2D?', 'pensando', {
-          accion: { texto: 'Volver al mapa 2D', alHacer: () => cambiarVista('2d') },
-        }),
-      });
-    } catch {
-      kusi.decir('Este equipo no puede mostrar el globo 3D. Seguimos con el mapa.', 'pensando');
-      botonVista?.remove();
-      return;
-    }
-  }
-  vista = nueva;
+function pintarBotonVista() {
+  if (!botonVista) return;
   const es3D = vista === '3d';
+  botonVista.classList.toggle('cargando', cargandoGlobo);
+  botonVista.setAttribute('aria-busy', String(cargandoGlobo));
+  botonVista.setAttribute('aria-pressed', String(es3D));
+  botonVista.setAttribute('aria-label', cargandoGlobo ? 'Preparando el globo 3D' : es3D ? 'Volver al mapa 2D' : 'Ver el globo 3D');
+  botonVista.querySelector('.js-vista').textContent = cargandoGlobo ? '…' : es3D ? '2D' : '3D';
+}
+function crearGlobo() {
+  try {
+    globo = new Globo3D($('.globo-contenedor'), {
+      alSeleccionar: (id) => mapa.alSeleccionar(id, { origen: 'globo' }),
+      margenAbajo: () => (hoja.activa ? hoja.altoVisible() : 0) + 20,
+      alLento: () => {
+        if (vista !== '3d') return;
+        kusi.decir('Tu equipo va un poco lento con el globo. ¿Volvemos al mapa 2D?', 'pensando', {
+          accion: { texto: 'Volver al mapa 2D', alHacer: () => cambiarVista('2d') },
+        });
+      },
+      alPerder: () => {
+        if (vista !== '3d') return;
+        cambiarVista('2d');
+        kusi.decir('El globo se apagó un momento. Seguimos en el mapa 2D; puedes volver al 3D cuando quieras.', 'pensando');
+      },
+    });
+    return true;
+  } catch {
+    globo = null;
+    kusi.decir('Este equipo no puede mostrar el globo 3D. Seguimos con el mapa.', 'pensando');
+    botonVista?.remove();
+    return false;
+  }
+}
+function cambiarVista(nueva) {
+  if (nueva === '3d' && !globo) {
+    // Armar el globo toma un momento: primero se muestra que está cargando
+    // (si no, el niño vuelve a tocar y el segundo toque lo regresa al 2D).
+    if (cargandoGlobo) return;
+    cargandoGlobo = true;
+    pintarBotonVista();
+    requestAnimationFrame(() => setTimeout(() => {
+      cargandoGlobo = false;
+      const listo = crearGlobo();
+      pintarBotonVista();
+      // Mientras cargaba pudo empezar un juego que solo usa el mapa 2D
+      if (listo && (!modo || modo.permite3D)) aplicarVista('3d');
+    }, 0));
+    return;
+  }
+  aplicarVista(nueva);
+}
+function aplicarVista(nueva) {
+  vista = nueva === '3d' && globo ? '3d' : '2d';
+  const es3D = vista === '3d';
+  ultimoCambioVista = performance.now();
   if (es3D) {
     globo.sincronizar({ seleccionado: mapa.seleccionado, juego: mapa.juego, visitados: [...mapa.visitados], opciones: mapa.opciones });
     globo.autoGiro = modo?.id === 'explorar';
@@ -187,11 +228,7 @@ function cambiarVista(nueva) {
   } else globo?.desactivar();
   $('.mapa-contenedor').classList.toggle('oculto-3d', es3D);
   zonaMapa.classList.toggle('vista-3d', es3D);
-  if (botonVista) {
-    botonVista.setAttribute('aria-pressed', String(es3D));
-    botonVista.setAttribute('aria-label', es3D ? 'Volver al mapa 2D' : 'Ver el globo 3D');
-    botonVista.querySelector('.js-vista').textContent = es3D ? '2D' : '3D';
-  }
+  pintarBotonVista();
 }
 // Lo que los modos le piden al mapa también se refleja en el globo
 for (const m of ['seleccionar', 'animarAcierto', 'animarError', 'mostrarRespuesta', 'setJuego', 'setVisitados', 'setOpciones', 'centrar']) {
@@ -227,19 +264,23 @@ dlgAjustes.addEventListener('change', (e) => {
 alCambiar(sincronizarAjustes);
 sincronizarAjustes();
 
-// El audio solo se activa después del primer toque (requisito de los navegadores)
-const primerToque = () => {
+// El audio solo se activa después de un toque (requisito de los navegadores).
+// En pantallas táctiles el permiso llega al levantar el dedo, así que se
+// escucha también pointerup y click, y se reintenta si el sistema lo suspende.
+let vozDesbloqueada = false;
+const alTocar = (e) => {
   desbloquear();
-  window.removeEventListener('pointerdown', primerToque, true);
-  window.removeEventListener('keydown', primerToque, true);
+  if (!vozDesbloqueada && e.type !== 'pointerdown') {
+    vozDesbloqueada = true;
+    desbloquearVoz();
+  }
 };
-window.addEventListener('pointerdown', primerToque, true);
-window.addEventListener('keydown', primerToque, true);
+for (const tipo of ['pointerdown', 'pointerup', 'click', 'keydown']) window.addEventListener(tipo, alTocar, true);
 
-// Diálogos: se cierran tocando fuera o con [data-cerrar]
+// Diálogos: se cierran tocando el fondo oscuro o con [data-cerrar]
 for (const d of app.querySelectorAll('dialog')) {
   d.addEventListener('click', (e) => {
-    if (e.target === d || e.target.closest('[data-cerrar]')) d.close();
+    if (toqueFuera(d, e) || e.target.closest('[data-cerrar]')) cerrarDialogo(d);
   });
 }
 
@@ -254,7 +295,7 @@ const reloj = {
     elTiempo.textContent = mmss(cuenta ? this.restante : this.segundos);
     elCrono.classList.toggle('cuenta', cuenta);
     elCrono.classList.toggle('urgente', cuenta && this.restante <= 5);
-    elCrono.setAttribute('aria-label', cuenta ? `Te quedan ${this.restante} segundos` : 'Tiempo de juego');
+    elCrono.setAttribute('aria-label', !cuenta ? 'Tiempo de juego' : this.restante === 1 ? 'Te queda 1 segundo' : `Te quedan ${this.restante} segundos`);
   },
   reiniciar() { this.segundos = 0; this.corriendo = true; this.restante = null; this.pintar(); },
   pausar() { this.corriendo = false; this.restante = null; this.pintar(); },
@@ -293,15 +334,21 @@ const ctx = {
   actualizarAbajo,
   activo: (m) => m === modo,
   terminar(idModo, titulo, resumen, fabrica) {
+    if (!pantallaFinal.hidden) return; // ya terminó (doble toque en "Siguiente")
     reloj.pausar();
     const { ciclo, nivel } = config();
-    const r = { ...resumen, dificiles: resumen.dificiles.filter((id) => PAISES_POR_ID[id]) };
+    const practica = !!modo?.practica;
+    // El tiempo es el del cronómetro que vio el niño (se pausa con diálogos abiertos)
+    const r = { ...resumen, segundos: reloj.segundos, dificiles: resumen.dificiles.filter((id) => PAISES_POR_ID[id]) };
     const estrellas = calcularEstrellas(r, nivel);
-    const record = registrarEstrellas(`${idModo}|${ciclo}|${nivel}`, estrellas);
-    registrarPartida({ modo: idModo, titulo, ciclo, nivel, estrellas, ...r });
+    // Una ronda de práctica no cambia el récord del juego completo
+    const record = !practica && registrarEstrellas(`${idModo}|${ciclo}|${nivel}`, estrellas);
+    registrarPartida({ modo: idModo, titulo, ciclo, nivel, estrellas, practica, ...r });
     kusi.callar();
-    pantallaFinal.innerHTML = htmlFinal({ titulo, resumen: r, estrellas, record, ciclo, nivel });
+    pantallaFinal.innerHTML = htmlFinal({ titulo, resumen: r, estrellas, record, ciclo, nivel, practica });
+    pantallaFinal.append(confetiFinal.canvas); // innerHTML lo había quitado
     pantallaFinal.hidden = false;
+    bloquearFondo(true);
     pantallaFinal.querySelector('.boton')?.focus({ preventScroll: true });
     sfx.victoria();
     setTimeout(() => confetiFinal.lanzar({ cantidad: 60 * estrellas, fuerza: 1.2 }), 300);
@@ -313,17 +360,35 @@ const ctx = {
       pantallaFinal.hidden = true;
       if (a === 'inicio') irInicio();
       if (a === 'otra') iniciarModo(idModo, fabrica());
-      if (a === 'practicar') iniciarModo(idModo, fabrica(r.dificiles));
+      if (a === 'practicar') iniciarModo(idModo, fabrica(r.dificiles), { practica: true });
     };
   },
 };
 
-function iniciarModo(id, nuevo) {
+// Con la pantalla de inicio o la final encima, el mapa y el panel no se pueden
+// usar (ni con Tab ni con un toque que se cuele).
+function bloquearFondo(si) {
+  for (const el of [panel, zonaMapa, kusi.el]) el.inert = si;
+}
+let tDesbloqueo = null;
+
+function detenerModo() {
   modo?.detener();
+  // Ningún toque en el mapa debe llegar al juego que se cerró
+  mapa.alSeleccionar = () => {};
+}
+
+function iniciarModo(id, nuevo, { practica = false } = {}) {
+  detenerModo();
   kusi.callar();
   pantallaFinal.hidden = true;
   modo = nuevo;
   modo.id = id;
+  modo.practica = practica;
+  // Un doble toque en la tarjeta no debe caer sobre el mapa del juego nuevo
+  bloquearFondo(true);
+  clearTimeout(tDesbloqueo);
+  tDesbloqueo = setTimeout(() => { if (modo === nuevo && pantallaFinal.hidden) bloquearFondo(false); }, 400);
   pantallaInicio.hidden = true;
   botonInicio.hidden = false;
   nombreModo.textContent = modo.titulo;
@@ -344,8 +409,10 @@ function iniciarModo(id, nuevo) {
 }
 
 function irInicio() {
-  modo?.detener();
+  detenerModo();
   modo = null;
+  clearTimeout(tDesbloqueo);
+  bloquearFondo(true);
   kusi.callar();
   reloj.pausar();
   pantallaFinal.hidden = true;
@@ -395,7 +462,7 @@ botonInicio.addEventListener('click', irInicio);
 const dlgPasaporte = $('#dialogo-pasaporte');
 $('.js-pasaporte').addEventListener('click', () => {
   dlgPasaporte.querySelector('.dialogo-cuerpo').innerHTML = htmlPasaporte(obtener());
-  dlgPasaporte.showModal();
+  abrirDialogo(dlgPasaporte);
 });
 
 // ───── Modo docente: mantener presionado el logo 3 segundos ─────
@@ -406,7 +473,7 @@ const abrirDocente = () => {
   logo.classList.remove('presionando');
   sfx.sello();
   dlgDocente.querySelector('.dialogo-cuerpo').innerHTML = htmlDocente(partidasSesion(), obtener());
-  dlgDocente.showModal();
+  abrirDialogo(dlgDocente);
 };
 const empezarPresion = () => {
   clearTimeout(tDocente);
@@ -433,7 +500,7 @@ dlgDocente.addEventListener('click', async (e) => {
     callar();
     reiniciarTodo();
     limpiarSesion();
-    dlgDocente.close();
+    cerrarDialogo(dlgDocente);
     irInicio();
   }
   if (a === 'copiar') {
@@ -453,11 +520,13 @@ zonaMapa.addEventListener('click', (e) => {
   if (accion === 'acercar') (en3D ? globo.acercar(1.4) : mapa.acercar(1.6));
   if (accion === 'alejar') (en3D ? globo.acercar(1 / 1.4) : mapa.acercar(1 / 1.6));
   if (accion === 'centrar') mapa.centrar();
-  if (accion === 'ajustes') dlgAjustes.showModal();
-  if (accion === 'vista') cambiarVista(vista === '3d' ? '2d' : '3d');
+  if (accion === 'ajustes') abrirDialogo(dlgAjustes);
+  // Un doble toque rápido no debe deshacer el cambio
+  if (accion === 'vista' && !cargandoGlobo && performance.now() - ultimoCambioVista > 400) cambiarVista(vista === '3d' ? '2d' : '3d');
 });
 
 // El mapa queda listo detrás de la pantalla de bienvenida
+bloquearFondo(true);
 progreso.poner(obtener().visitados.length, 12, 'visitados');
 requestAnimationFrame(() => mapa.centrar());
 

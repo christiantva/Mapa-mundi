@@ -3,7 +3,7 @@ import { PAISES_POR_ID, GUAYANA_FRANCESA, elPais } from '../data/paises.js';
 import { Partida, barajar } from '../core/partida.js';
 import { config, ORDEN_GEOGRAFICO } from '../core/config.js';
 import { crearPreguntas } from './preguntas.js';
-import { cabeceraModo, intentosHTML, pistasHTML, felicitar, temporizadores, esc } from './comun.js';
+import { cabeceraModo, intentosHTML, pistasHTML, felicitar, temporizadores, esc, reemplazarPanel } from './comun.js';
 import { ICONOS } from '../ui/iconos.js';
 
 const MAX_ERRORES = 3;
@@ -34,7 +34,7 @@ export function crearEncuentra(ctx, { ids } = {}) {
         <button type="button" class="boton boton-primario" data-accion="siguiente">Siguiente</button>`;
     }
     const progresoReto = q.necesarios > 1 ? `<p class="juego-quedan"><strong>${hallados.size}</strong> de ${q.necesarios} encontrados</p>` : '';
-    contenido.innerHTML = `
+    reemplazarPanel(contenido, `
       <div class="juego">
         ${cabeceraModo(titulo, partida.numero, partida.total)}
         <p class="pregunta">${q.texto}</p>
@@ -42,7 +42,7 @@ export function crearEncuentra(ctx, { ids } = {}) {
         ${intentosHTML(partida.erroresDe(claveError(q)), MAX_ERRORES)}
         ${pistasHTML(pistas)}
         <div class="juego-pie">${pie}</div>
-      </div>`;
+      </div>`);
   }
 
   function preguntar() {
@@ -79,8 +79,9 @@ export function crearEncuentra(ctx, { ids } = {}) {
       const faltan = q.acepta.filter((id) => !hallados.has(id));
       faltan.forEach((id, i) => t.despues(i * 450, () => mapa.animarAcierto(id)));
       const nombres = faltan.map((id) => elPais(id)).join(', ');
-      kusi.decir(`${inicio} Faltaban: ${nombres}.`, 'explicando', { fijo: true });
-      pintar(`Faltaban: <strong>${esc(nombres)}</strong>.`);
+      const faltaban = faltan.length === 1 ? 'Faltaba' : 'Faltaban';
+      kusi.decir(`${inicio} ${faltaban}: ${nombres}.`, 'explicando', { fijo: true });
+      pintar(`${faltaban}: <strong>${esc(nombres)}</strong>.`);
     }
     t.despues(cfg.limite ? 4000 : 6000, siguiente);
   }
@@ -100,7 +101,8 @@ export function crearEncuentra(ctx, { ids } = {}) {
       const pt = mapa.aPantalla(...mapa.puntoDe(id));
       confeti.lanzar({ x: pt?.[0], y: pt?.[1], cantidad: 70 });
       if (hallados.size < q.necesarios) {
-        kusi.decir(`¡Sí! ${elPais(id)} es vecino del Perú. Faltan ${q.necesarios - hallados.size}.`, 'celebrando', { fijo: true });
+        const quedan = q.necesarios - hallados.size;
+        kusi.decir(`¡Sí! ${elPais(id)} es vecino del Perú. ${quedan === 1 ? 'Falta 1' : `Faltan ${quedan}`}.`, 'celebrando', { fijo: true });
         pintar();
         return;
       }
@@ -122,15 +124,16 @@ export function crearEncuentra(ctx, { ids } = {}) {
     const n = partida.error(clave);
     mapa.animarError(id);
     sfx.error();
-    const tocado = id === GUAYANA_FRANCESA.id ? 'la Guayana Francesa, que es de Francia' : elPais(id);
+    const tocado = id === GUAYANA_FRANCESA.id ? 'Esa es la Guayana Francesa, que es de Francia' : `Ese es ${elPais(id)}`;
     if (n >= MAX_ERRORES) {
-      mostrarRespuesta(q, `Ese es ${tocado}.`);
+      mostrarRespuesta(q, `${tocado}.`);
       return;
     }
     const darPista = cfg.pistas === 'auto' || (cfg.pistas === 'pedir' && n >= 2);
     const pista = q.pistas[Math.min(n - 1, q.pistas.length - 1)];
     if (darPista && pista && !pistas.includes(pista)) pistas.push(pista);
-    const motivo = q.necesarios > 1 ? `Ese es ${tocado}: no limita con el Perú.` : `Ese es ${tocado}.`;
+    let motivo = `${tocado}.`;
+    if (q.necesarios > 1) motivo = id === 'peru' ? 'Ese es el Perú, ¡nuestro país! Busca a sus vecinos.' : `${tocado}: no limita con el Perú.`;
     kusi.decir(darPista && pista ? `${motivo} Pista: ${pista}` : `${motivo} ¡Intenta otra vez!`, 'pensando', { fijo: true });
     pintar();
   }

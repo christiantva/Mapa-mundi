@@ -9,7 +9,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 const lista = (items) => {
   if (items.length <= 1) return items.join('');
-  const ultimo = items.at(-1);
+  const ultimo = items[items.length - 1];
   // Si el último ya empieza con "y" (por ejemplo "y otras lenguas"), no lo repetimos
   const union = /^y /.test(ultimo) ? ' ' : ' y ';
   return `${items.slice(0, -1).join(', ')}${union}${ultimo}`;

@@ -1,6 +1,6 @@
 // Kusi, la vicuña viajera: personaje guía dibujado en SVG por código.
 // Estados: saludo, explicando, celebrando, pensando, durmiendo (y normal).
-import { decir as hablar, callar } from '../core/voz.js';
+import { decir as hablar, soltar } from '../core/voz.js';
 import { ICONOS } from './iconos.js';
 
 const PIEL = '#C98B4F';
@@ -112,9 +112,10 @@ export class Kusi {
 
     this.el.querySelector('.kusi-boton').addEventListener('click', () => {
       if (this.actual === 'durmiendo') this.despertar();
-      else if (this.ultimo) this.decir(this.ultimo, 'explicando');
+      else if (this.ultimo) this.decir(this.ultimo, 'explicando', { ya: true });
     });
-    this.el.querySelector('.kusi-escuchar').addEventListener('click', () => hablar(this.ultimo, { forzar: true }));
+    // El niño pide escuchar: se lee aunque la voz esté apagada, desde el principio
+    this.el.querySelector('.kusi-escuchar').addEventListener('click', () => hablar(this.ultimo, { forzar: true, ya: true }));
 
     // Se duerme si no hay actividad durante 30 s
     this.actividad = performance.now();
@@ -143,7 +144,7 @@ export class Kusi {
   }
 
   /** Muestra un mensaje en el globo, lo lee si la voz está activa y anima a Kusi. */
-  decir(texto, estado = 'explicando', { fijo = false, accion = null } = {}) {
+  decir(texto, estado = 'explicando', { fijo = false, accion = null, ya = false } = {}) {
     this.ultimo = texto;
     this.texto.textContent = texto;
     const b = this.el.querySelector('.kusi-accion');
@@ -158,7 +159,7 @@ export class Kusi {
     void this.globo.offsetWidth;
     this.globo.classList.add('entra');
     this.estado(estado);
-    hablar(texto);
+    hablar(texto, { ya });
     clearTimeout(this.tVolver);
     clearTimeout(this.tOcultar);
     const lectura = Math.max(2200, texto.split(/\s+/).length * 380);
@@ -181,8 +182,9 @@ export class Kusi {
     this.decir('¡Uy, me quedé dormida! ¿Seguimos jugando?', 'saludo');
   }
 
+  /** Esconde el globo y descarta lo que faltaba leer (la oración en curso termina). */
   callar() {
-    callar();
+    soltar();
     this.ocultarGlobo();
   }
 }

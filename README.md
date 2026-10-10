@@ -56,6 +56,7 @@ juego al final de cada ficha, y el informe completo está en
 | 3 | Globo 3D (Three.js), ciclo + nivel, pasaporte, estrellas, pantalla final, modo docente | ✅ |
 | 4 | Build final, pruebas en móvil y escritorio, peso final | ✅ |
 | 5 | Investigación y verificación de todos los datos con fuentes reales | ✅ |
+| 6 | Revisión completa del código y corrección de errores (voz, globo 3D y más) | ✅ |
 
 ## Ciclo y nivel
 
@@ -80,8 +81,10 @@ Muestra los resultados de la sesión, permite copiarlos y reiniciar todo el prog
 
 ## Archivo final
 
-`dist/index.html` es el juego completo en un solo archivo: **1099 KB** (1,07 MB;
-unos 369 KB comprimido con gzip). Funciona abriéndolo con doble clic, sin internet.
+`dist/index.html` es el juego completo en un solo archivo: **1125 KB** (1,10 MB;
+unos 375 KB comprimido con gzip). Funciona abriéndolo con doble clic, sin internet.
+Al inicio del archivo van los avisos de licencia de las bibliotecas incluidas
+(three.js, d3, topojson, world-atlas y la fuente Nunito), como piden sus licencias.
 
 | Parte | Peso aprox. |
 |---|---|
@@ -91,6 +94,51 @@ unos 369 KB comprimido con gzip). Funciona abriéndolo con doble clic, sin inter
 | Mapa mundial para el globo (1:110m) | 100 KB |
 | D3 + TopoJSON | 77 KB |
 | Estilos + fuente Nunito incrustada | ~140 KB |
+
+## Fase 6: errores corregidos
+
+- **Voz de Kusi que se cortaba a media frase.** Antes, cada mensaje nuevo
+  cancelaba al anterior. Ahora:
+  - Se lee por oraciones.
+  - Un mensaje nuevo espera a que termine la oración en curso.
+  - Al cambiar un ajuste ya no se corta la lectura.
+  - Se evita el corte de Chrome en lecturas largas (unos 15 s).
+- **Del globo 3D no se podía volver al 2D en equipos lentos.** El globo se
+  dibujaba 60 veces por segundo y el primer armado tardaba sin avisar, así que un
+  segundo toque lo deshacía. Ahora:
+  - Solo se dibuja cuando algo cambia.
+  - El botón muestra "…" mientras se arma y se ignoran los toques dobles.
+  - Sin tarjeta gráfica, baja la resolución y no gira solo.
+  - Si se pierde el contexto gráfico, vuelve al 2D.
+- **Arrastra la bandera.** Una bandera podía colocarse dos veces (doble puntaje y
+  fin de juego antes de tiempo).
+- **Sonido y voz en tablets.** No sonaban porque el permiso de audio se pedía al
+  apoyar el dedo y no al levantarlo.
+- **Práctica.** Una ronda de práctica ya no reemplaza el récord del juego completo.
+- **Tiempo.** El tiempo de la partida es el del cronómetro (se pausa con los
+  diálogos abiertos).
+- **Inicio y pantalla final.** Con estas pantallas encima, el mapa y el panel ya no
+  reciben toques ni el foco del teclado. Un doble toque en una tarjeta ya no
+  responde una pregunta.
+- **Girar el celular o la tablet.** El mapa se vuelve a encuadrar. En el celular
+  horizontal el panel va al costado (la hoja tapaba el mapa).
+- **Toques en el mapa.** Un dedo apoyado en otro lado de la pantalla ya no bloquea
+  los toques, y el clic derecho no cuenta como respuesta.
+- **Otros arreglos:**
+  - El confeti de la pantalla final no aparecía.
+  - Al tocar el borde interior de un diálogo, este se cerraba.
+  - Nombres encimados en el globo.
+  - Martinica y Guadalupe faltaban en el mapa.
+  - Datos guardados dañados podían bloquear el juego.
+  - Navegadores antiguos (sin `dvh`, `.at()` ni `<dialog>`).
+  - Zonas seguras del celular con muesca.
+  - Build en Windows o en carpetas con espacios.
+- **Concordancia:**
+  - "¿En qué país están las islas Galápagos?"
+  - "Falta 1"
+  - "Esa es la Guayana Francesa"
+  - "Te queda 1 segundo"
+  - "1 estrella"
 
 ## Pruebas realizadas (Fase 4)
 

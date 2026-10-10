@@ -3,6 +3,7 @@ import { obtener, marcarVisitado, alCambiar } from '../core/estado.js';
 import { fichaPais, fichaBienvenida, dialogoBandera } from '../ui/ficha.js';
 import { PAISES_POR_ID, GUAYANA_FRANCESA, aPais } from '../data/paises.js';
 import { config } from '../core/config.js';
+import { abrirDialogo } from '../ui/dialogo.js';
 
 export function crearExplorar(ctx) {
   const { mapa, hoja, contenido, app, kusi, sfx, confeti } = ctx;
@@ -51,7 +52,7 @@ export function crearExplorar(ctx) {
     }
     if (e.target.closest('[data-accion="ampliar-bandera"]') && actual) {
       dlgBandera.querySelector('.dialogo-cuerpo').innerHTML = dialogoBandera(actual);
-      dlgBandera.showModal();
+      abrirDialogo(dlgBandera);
     }
   }
 

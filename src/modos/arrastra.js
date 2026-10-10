@@ -4,7 +4,7 @@
 import { PAISES, PAISES_POR_ID, GUAYANA_FRANCESA, dePais } from '../data/paises.js';
 import { Partida, barajar } from '../core/partida.js';
 import { bandera } from '../ui/banderas.js';
-import { cabeceraModo, felicitar, temporizadores, esc } from './comun.js';
+import { cabeceraModo, felicitar, temporizadores, esc, reemplazarPanel } from './comun.js';
 import { reduceMovimiento } from '../core/estado.js';
 import { config } from '../core/config.js';
 
@@ -21,7 +21,7 @@ export function crearArrastra(ctx, { ids } = {}) {
 
   function pintarPanel(mensaje = '') {
     const quedan = partida.total - partida.resueltos.length;
-    contenido.innerHTML = `
+    reemplazarPanel(contenido, `
       <div class="juego">
         ${cabeceraModo(titulo)}
         <p class="pregunta">Arrastra cada bandera hasta su país.</p>
@@ -29,7 +29,7 @@ export function crearArrastra(ctx, { ids } = {}) {
         <p class="juego-ayuda">También puedes tocar una bandera y después tocar el país.</p>
         <p class="juego-quedan"><strong>${quedan}</strong> ${quedan === 1 ? 'bandera por colocar' : 'banderas por colocar'}</p>
         ${mensaje ? `<p class="aviso"><span>${mensaje}</span></p>` : ''}
-      </div>`;
+      </div>`);
   }
 
   function crearBandeja(lista) {
@@ -54,6 +54,7 @@ export function crearArrastra(ctx, { ids } = {}) {
   }
 
   function elegir(item) {
+    if (item?.disabled) item = null; // bandera que ya va camino a su país
     for (const b of bandeja.querySelectorAll('.bandeja-item')) {
       b.classList.toggle('elegida', b === item);
       b.setAttribute('aria-selected', String(b === item));
@@ -68,7 +69,7 @@ export function crearArrastra(ctx, { ids } = {}) {
   // ───── Arrastre con Pointer Events ─────
   function inicioArrastre(e) {
     const item = e.target.closest('.bandeja-item');
-    if (!item || !e.isPrimary) return;
+    if (!item || item.disabled || !e.isPrimary || arrastre) return;
     e.preventDefault();
     const r = item.getBoundingClientRect();
     arrastre = { item, id: item.dataset.bandera, x0: e.clientX, y0: e.clientY, movido: false, dx: e.clientX - r.left, dy: e.clientY - r.top, r };
@@ -160,6 +161,8 @@ export function crearArrastra(ctx, { ids } = {}) {
     if (a) volverABandeja(a);
     const p = PAISES_POR_ID[idBandera];
     if (n >= MAX_ERRORES) {
+      // La bandera queda bloqueada mientras Kusi la lleva a su lugar
+      apartar(idBandera, item);
       kusi.decir(`Mira, esta es la bandera ${dePais(p)}. ¡La pongo en su lugar!`, 'explicando');
       t.despues(900, () => colocar(idBandera, item, null, false));
       return;
@@ -172,7 +175,19 @@ export function crearArrastra(ctx, { ids } = {}) {
     pintarPanel(n === 2 && cfg.pistas !== 'no' ? `Esa bandera es ${p.articulo ? 'del' : 'de'} <strong>${esc(p.nombre)}</strong>.` : '');
   }
 
+  // Saca una bandera del juego (ya no se puede elegir ni arrastrar)
+  function apartar(id, item) {
+    if (item) {
+      item.disabled = true;
+      item.classList.add('colocando');
+    }
+    if (elegida === id) elegir(null);
+  }
+
   function colocar(id, item, fantasma, acerto = true) {
+    // Cada bandera se coloca una sola vez (evita doble puntaje con toques rápidos)
+    if (!bandeja || partida.resueltos.includes(id)) { fantasma?.remove(); return; }
+    apartar(id, item);
     if (acerto) partida.acierto(id);
     else partida.resueltos.push(id);
     const [lon, lat] = mapa.puntoDe(id);
@@ -181,6 +196,7 @@ export function crearArrastra(ctx, { ids } = {}) {
 
     const poner = () => {
       fantasma?.remove();
+      if (!bandeja) return; // se salió del juego durante la animación
       item?.remove();
       const g = document.createElementNS(NS, 'g');
       g.setAttribute('class', 'bandera-pin');
@@ -226,9 +242,13 @@ export function crearArrastra(ctx, { ids } = {}) {
       kusi.decir('Primero elige una bandera de la bandeja.', 'explicando');
       return;
     }
-    const item = bandeja.querySelector(`[data-bandera="${elegida}"]`);
+    const item = bandeja?.querySelector(`[data-bandera="${elegida}"]`);
     const b = elegida;
     elegir(null);
+    if (!item || item.disabled) {
+      kusi.decir('Primero elige una bandera de la bandeja.', 'explicando');
+      return;
+    }
     if (b === id) colocar(b, item, null);
     else intentar(b, id);
   }
@@ -236,7 +256,7 @@ export function crearArrastra(ctx, { ids } = {}) {
   // Se acabó el tiempo para esta bandera: Kusi la coloca y seguimos.
   function sinTiempo() {
     if (!bandeja) return;
-    const item = (elegida && bandeja.querySelector(`[data-bandera="${elegida}"]`)) || bandeja.querySelector('.bandeja-item');
+    const item = (elegida && bandeja.querySelector(`[data-bandera="${elegida}"]:not([disabled])`)) || bandeja.querySelector('.bandeja-item:not([disabled])');
     if (!item) return;
     if (arrastre) cancelarArrastre();
     elegir(null);

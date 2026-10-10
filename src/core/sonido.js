@@ -28,10 +28,15 @@ function crear() {
   return ctx;
 }
 
-/** Llamar en el primer pointerdown/keydown. */
+/**
+ * Crea el audio o lo reanuda. Se llama en cada toque: en pantallas táctiles el
+ * permiso llega recién al levantar el dedo, y el sistema puede suspender el
+ * audio (por ejemplo, al bloquear la tablet).
+ */
 export function desbloquear() {
   const c = crear();
-  if (c && c.state === 'suspended') c.resume();
+  if (!c) return;
+  if (c.state !== 'running') c.resume?.().catch(() => {});
   if (ajustes.musica) iniciarMusica();
 }
 
@@ -45,7 +50,11 @@ export function configurar({ efectos, musica: conMusica }) {
   else detenerMusica();
 }
 
-const listo = () => ctx && ctx.state === 'running' && ajustes.efectos;
+const listo = () => {
+  if (!ctx || !ajustes.efectos) return false;
+  if (ctx.state !== 'running') { ctx.resume?.().catch(() => {}); return false; }
+  return true;
+};
 
 // Nota con envolvente ADSR simple
 function nota(frec, inicio, dur, { tipo = 'sine', vol = 0.25, ataque = 0.01, salida = busEfectos, glissA = null } = {}) {
@@ -204,7 +213,12 @@ function iniciarMusica() {
   };
 
   const programar = () => {
-    const limite = ctx.currentTime + 0.25;
+    const ahora = ctx.currentTime;
+    // Si la pestaña estuvo oculta, el temporizador se atrasa: retomamos desde
+    // ahora en vez de tocar de golpe todas las notas atrasadas.
+    if (estado.siguiente < ahora) estado.siguiente = ahora + 0.05;
+    if (estado.tBajo < ahora) estado.tBajo = ahora + 0.05;
+    const limite = ahora + 0.25;
     while (estado.siguiente < limite) {
       const [m, d] = MELODIA[estado.i];
       const dur = d * corchea;

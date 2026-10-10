@@ -16,6 +16,8 @@ const LUGAR = {
 };
 
 const fuerte = (t) => `<strong>${esc(t)}</strong>`;
+// "está el Salar de Uyuni", pero "están las islas Galápagos"
+const esta = (lugar) => (/^(las|los) /.test(lugar) ? 'están' : 'está');
 const oceano = (p) => p.oceanos[0]?.split(' ')[0];
 
 const TIPOS = {
@@ -36,8 +38,8 @@ const TIPOS = {
     voz: `¿En qué país el idioma oficial es el ${IDIOMA_UNICO[p.id]}?`,
   }),
   lugar: (p) => ({
-    texto: `¿En qué país está ${fuerte(LUGAR[p.id])}?`,
-    voz: `¿En qué país está ${LUGAR[p.id]}?`,
+    texto: `¿En qué país ${esta(LUGAR[p.id])} ${fuerte(LUGAR[p.id])}?`,
+    voz: `¿En qué país ${esta(LUGAR[p.id])} ${LUGAR[p.id]}?`,
   }),
   combinada: (p) => {
     const mar = p.oceanos.length ? `Está junto al océano ${oceano(p)}` : 'No tiene mar';

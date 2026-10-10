@@ -1,5 +1,13 @@
 // Estado global mínimo del juego con suscripción a cambios.
 import { cargar, guardar } from './almacen.js';
+import { PAISES_POR_ID } from '../data/paises.js';
+
+const CICLOS_VALIDOS = ['III', 'IV', 'V'];
+const NIVELES_VALIDOS = ['facil', 'medio', 'dificil'];
+const objetoGuardado = () => {
+  const g = cargar();
+  return g && typeof g === 'object' ? g : {};
+};
 
 const POR_DEFECTO = {
   visitados: [], // países con sello en el pasaporte
@@ -17,14 +25,27 @@ const POR_DEFECTO = {
   },
 };
 
-const guardado = cargar() ?? {};
-const estado = {
-  ...POR_DEFECTO,
-  ...guardado,
-  ajustes: { ...POR_DEFECTO.ajustes, ...(guardado.ajustes ?? {}) },
-  visitados: Array.isArray(guardado.visitados) ? guardado.visitados : [],
-  records: guardado.records && typeof guardado.records === 'object' ? guardado.records : {},
-};
+// Lo guardado puede venir de una versión anterior o estar dañado: solo se
+// aceptan valores conocidos (si no, la pantalla de inicio no funcionaría).
+function limpiar(g) {
+  const objeto = (x) => (x && typeof x === 'object' && !Array.isArray(x) ? x : {});
+  const ajustes = { ...POR_DEFECTO.ajustes };
+  for (const [k, v] of Object.entries(objeto(g.ajustes))) if (k in ajustes && typeof v === 'boolean') ajustes[k] = v;
+  const records = {};
+  for (const [k, v] of Object.entries(objeto(g.records))) {
+    const n = Math.round(Number(v));
+    if (n >= 1) records[k] = Math.min(3, n);
+  }
+  return {
+    ciclo: CICLOS_VALIDOS.includes(g.ciclo) ? g.ciclo : POR_DEFECTO.ciclo,
+    nivel: NIVELES_VALIDOS.includes(g.nivel) ? g.nivel : POR_DEFECTO.nivel,
+    visitados: Array.isArray(g.visitados) ? [...new Set(g.visitados)].filter((id) => PAISES_POR_ID[id]) : [],
+    records,
+    ajustes,
+  };
+}
+
+const estado = limpiar(objetoGuardado());
 
 const oyentes = new Set();
 

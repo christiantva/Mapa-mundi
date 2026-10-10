@@ -9,7 +9,7 @@ import { marcarVisitado } from '../core/estado.js';
 import { config, RUTA_AVION } from '../core/config.js';
 import { Avion } from '../map/avion.js';
 import { bandera } from '../ui/banderas.js';
-import { cabeceraModo, intentosHTML, felicitar, temporizadores, esc } from './comun.js';
+import { cabeceraModo, intentosHTML, felicitar, temporizadores, esc, reemplazarPanel } from './comun.js';
 import { ICONOS } from '../ui/iconos.js';
 
 const LIMA = [-77.03, -12.05];
@@ -51,14 +51,14 @@ export function crearAvion(ctx, { ids } = {}) {
     const texto = porPais
       ? `${vuelta ? '¡Volvemos a casa! ' : ''}¿Qué país tiene el globo amarillo?`
       : `${vuelta ? '¡Volvemos a casa! ' : ''}¿Cuál es la capital ${vuelta ? 'del' : 'de'} <strong>${esc(p.nombre)}</strong>?`;
-    contenido.innerHTML = `
+    reemplazarPanel(contenido, `
       <div class="juego">
         ${cabeceraModo(titulo, partida.numero, partida.total)}
         <p class="pregunta">${texto}</p>
         <div class="opciones">${botones}</div>
         ${intentosHTML(partida.erroresDe(p.id), MAX_ERRORES)}
         ${mensaje ? `<p class="aviso"><span>${mensaje}</span></p>` : ''}
-      </div>`;
+      </div>`);
   }
 
   function preguntar() {
