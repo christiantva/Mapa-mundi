@@ -63,9 +63,13 @@ for (const g of t50.objects.countries.geometries) {
     continue;
   }
   if (g.id === '250') {
-    // Francia: solo nos quedamos con el polígono de la Guayana Francesa.
-    const guayana = polys(g).filter((p) => { const b = ringsBBox(t50, p); return b.w > -55 && b.e < -50 && b.n < 7; });
+    // Francia: la Guayana Francesa va aparte (se puede tocar); Martinica y
+    // Guadalupe quedan como contexto gris, igual que las demás islas del Caribe.
+    const esGuayana = (p) => { const b = ringsBBox(t50, p); return b.w > -55 && b.e < -50 && b.n < 7; };
+    const guayana = polys(g).filter(esGuayana);
     if (guayana.length) elegidos.push({ type: 'MultiPolygon', arcs: guayana, id: 'guayana-francesa', properties: { fr: 1 } });
+    const caribe = polys(g).filter((p) => !esGuayana(p) && inBox(ringsBBox(t50, p)));
+    if (caribe.length) elegidos.push({ type: 'MultiPolygon', arcs: caribe, id: 'c250-caribe', properties: { name: 'France' } });
     continue;
   }
   const keep = polys(g).filter((p) => inBox(ringsBBox(t50, p)));

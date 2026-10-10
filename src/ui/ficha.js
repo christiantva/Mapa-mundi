@@ -2,26 +2,41 @@
 // tablet vertical es una hoja deslizable desde abajo (ver hoja.js).
 import { PAISES_POR_ID, GUAYANA_FRANCESA, nombreDe, formatoMiles } from '../data/paises.js';
 import { bandera } from './banderas.js';
+import { FUENTES } from '../data/fuentes.js';
 import { ICONOS } from './iconos.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 const lista = (items) => {
   if (items.length <= 1) return items.join('');
-  return `${items.slice(0, -1).join(', ')} y ${items.at(-1)}`;
+  const ultimo = items[items.length - 1];
+  // Si el último ya empieza con "y" (por ejemplo "y otras lenguas"), no lo repetimos
+  const union = /^y /.test(ultimo) ? ' ' : ' y ';
+  return `${items.slice(0, -1).join(', ')}${union}${ultimo}`;
 };
 
 const fila = (icono, etiqueta, valor) => `
-  <div class="dato">
+  <li class="dato">
     <span class="dato-icono" aria-hidden="true">${ICONOS[icono]}</span>
-    <div><dt>${etiqueta}</dt><dd>${valor}</dd></div>
-  </div>`;
+    <div><span class="dato-etiqueta">${etiqueta}</span><span class="dato-valor">${valor}</span></div>
+  </li>`;
 
 const tarjeta = (icono, titulo, item) => `
   <li class="cultura">
     <span class="dato-icono" aria-hidden="true">${ICONOS[icono]}</span>
     <div><span class="cultura-tipo">${titulo}</span><strong>${esc(item.nombre)}</strong><p>${esc(item.detalle)}</p></div>
   </li>`;
+
+// Fuentes verificadas de cada dato (para el docente)
+function fuentesHTML(p) {
+  const lista = FUENTES[p.id] ?? [];
+  if (!lista.length) return '';
+  return `
+    <details class="fuentes">
+      <summary>Fuentes de estos datos</summary>
+      <ul>${lista.map((f) => `<li><strong>${esc(f.dato)}:</strong> ${esc(f.fuente)}. <a href="${esc(f.url)}" target="_blank" rel="noopener noreferrer">Ver fuente</a></li>`).join('')}</ul>
+    </details>`;
+}
 
 export function fichaBienvenida(visitados) {
   return `
@@ -37,7 +52,7 @@ export function fichaBienvenida(visitados) {
     </div>`;
 }
 
-export function fichaPais(id, { recienSellado = false } = {}) {
+export function fichaPais(id, { recienSellado = false, ciclo = 'V' } = {}) {
   if (id === GUAYANA_FRANCESA.id) return fichaTerritorio();
   const p = PAISES_POR_ID[id];
   if (!p) return '';
@@ -53,6 +68,10 @@ export function fichaPais(id, { recienSellado = false } = {}) {
   const mar = p.oceanos.length
     ? `Océano ${lista(p.oceanos.map(esc))}`
     : '<strong>No tiene mar.</strong> Está rodeado de otros países.';
+  const III = ciclo === 'III', V = ciclo === 'V';
+  // En III ciclo los textos son muy cortos: solo la primera oración.
+  const descripcion = III ? (p.descripcion.match(/^[^.!?]*[.!?]/)?.[0] ?? p.descripcion) : p.descripcion;
+  const vecinoPeru = p.id !== 'peru' && p.limitrofes.includes('peru');
 
   return `
     <article class="ficha" aria-labelledby="ficha-titulo">
@@ -75,19 +94,26 @@ export function fichaPais(id, { recienSellado = false } = {}) {
 
       <p class="ficha-capital-corta"><span aria-hidden="true">${ICONOS.capital}</span> Capital: ${p.capitales.map((c) => `<strong>${esc(c.nombre)}</strong>`).join(' y ')}</p>
 
-      <p class="ficha-descripcion">${esc(p.descripcion)}</p>
+      <p class="ficha-descripcion">${esc(descripcion)}</p>
 
-      ${p.notaCapital ? `<aside class="nota nota-capital"><span aria-hidden="true">${ICONOS.info}</span><p>${esc(p.notaCapital)}</p></aside>` : ''}
+      ${vecinoPeru && !III ? `<p class="insignia-vecino">${ICONOS.vecinos} Es vecino del Perú</p>` : ''}
 
+      ${p.notaCapital && !III ? `<aside class="nota nota-capital"><span aria-hidden="true">${ICONOS.info}</span><p>${esc(p.notaCapital)}</p></aside>` : ''}
+
+      ${III ? `
+      <section class="ficha-seccion">
+        <h3>Sus vecinos</h3>
+        <div class="chips">${vecinos}</div>
+      </section>` : `
       <section class="ficha-seccion">
         <h3>Datos</h3>
-        <dl class="datos">
+        <ul class="datos">
           ${fila('capital', p.capitales.length > 1 ? 'Capitales' : 'Capital', capitales)}
           ${fila('personas', 'Población', `${esc(p.poblacion.texto)} de habitantes <span class="fuente">(${p.poblacion.anio})</span>`)}
           ${fila('superficie', 'Superficie', `${formatoMiles(p.superficie)} km²`)}
-          ${fila('idioma', p.idiomas.length > 1 ? 'Idiomas oficiales' : 'Idioma oficial', esc(lista(p.idiomas)))}
-          ${fila('moneda', 'Moneda', esc(p.moneda))}
-        </dl>
+          ${V ? fila('idioma', p.idiomas.length > 1 ? 'Idiomas oficiales' : 'Idioma oficial', esc(lista(p.idiomas))) : ''}
+          ${V ? fila('moneda', 'Moneda', esc(p.moneda)) : ''}
+        </ul>
       </section>
 
       <section class="ficha-seccion">
@@ -101,25 +127,30 @@ export function fichaPais(id, { recienSellado = false } = {}) {
         <h3>Naturaleza</h3>
         <p class="etiqueta-mini">Regiones naturales:</p>
         <ul class="regiones">${p.regiones.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
-        <p class="ficha-relieve"><span aria-hidden="true">${ICONOS.montana}</span> ${esc(p.relieve)}</p>
-      </section>
+        ${V ? `<p class="ficha-relieve"><span aria-hidden="true">${ICONOS.montana}</span> ${esc(p.relieve)}</p>` : ''}
+      </section>`}
 
+      ${V ? `
       <section class="ficha-seccion">
         <h3>Cultura</h3>
         <ul class="culturas">
           ${tarjeta('plato', 'Plato típico', p.plato)}
-          ${tarjeta('animal', 'Animal emblemático', p.animal)}
+          ${tarjeta('animal', 'Animal representativo', p.animal)}
           ${tarjeta('lugar', 'Lugar famoso', p.lugar)}
           ${tarjeta('fiesta', 'Fiesta o tradición', p.fiesta)}
         </ul>
-      </section>
+      </section>` : `
+      <ul class="culturas">${tarjeta('animal', 'Animal representativo', p.animal)}${III ? '' : tarjeta('lugar', 'Lugar famoso', p.lugar)}</ul>`}
 
+      ${III ? '' : `
       <aside class="dato-curioso">
         <span class="dato-icono" aria-hidden="true">${ICONOS.foco}</span>
         <div><strong>¿Sabías que…?</strong><p>${esc(p.datoCurioso)}</p></div>
-      </aside>
+      </aside>`}
 
-      ${p.notaExtra ? `<aside class="nota"><span aria-hidden="true">${ICONOS.info}</span><p>${esc(p.notaExtra)}</p></aside>` : ''}
+      ${p.notaExtra && V ? `<aside class="nota"><span aria-hidden="true">${ICONOS.info}</span><p>${esc(p.notaExtra)}</p></aside>` : ''}
+
+      ${fuentesHTML(p)}
     </article>`;
 }
 
@@ -143,12 +174,12 @@ function fichaTerritorio() {
       <p class="ficha-descripcion">${g.descripcion}</p>
       <section class="ficha-seccion">
         <h3>Datos</h3>
-        <dl class="datos">
+        <ul class="datos">
           ${fila('capital', 'Ciudad principal', `<strong>${g.capitales[0].nombre}</strong>`)}
           ${fila('idioma', 'Idioma', 'francés')}
           ${fila('moneda', 'Moneda', 'euro')}
           ${fila('vecinos', 'Limita con', 'Brasil y Surinam')}
-        </dl>
+        </ul>
       </section>
     </article>`;
 }

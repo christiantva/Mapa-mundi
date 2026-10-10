@@ -39,6 +39,9 @@ export class Mapa2D {
     this.opciones = { nombres: true, capitales: true, ecuador: false, tropico: false };
     this.visitados = new Set();
     this.rotulos = []; // elementos en la capa sin escala: { el, lon, lat, zoomMin }
+    this.alZoom = new Set(); // funciones que se llaman en cada cuadro de zoom
+    this.alRedimensionar = new Set();
+    this.juego = null; // { nombres: (id) => bool, capitales: bool } durante un juego
 
     this.#crearSvg();
     this.#crearZoom();
@@ -79,15 +82,21 @@ export class Mapa2D {
           <path class="linea-ref linea-ecuador"/>
           <path class="linea-ref linea-tropico"/>
           <g class="elevado"></g>
+          <g class="capa-efectos"></g>
+          <g class="capa-rutas"></g>
           <path class="borde-globo"/>
         </g>
         <g class="capa-rotulos" aria-hidden="true"></g>
+        <g class="capa-superior" aria-hidden="true"></g>
       </svg>`;
     this.svg = this.cont.querySelector('svg');
     this.sel = select(this.svg);
     this.gZoom = this.svg.querySelector('.capa-zoom');
     this.gRotulos = this.svg.querySelector('.capa-rotulos');
     this.gElevado = this.svg.querySelector('.elevado');
+    this.gEfectos = this.svg.querySelector('.capa-efectos');
+    this.gRutas = this.svg.querySelector('.capa-rutas');
+    this.gSuperior = this.svg.querySelector('.capa-superior');
 
     this.proyeccion = geoOrthographic().rotate([-CENTRO[0], -CENTRO[1]]).clipAngle(RADIO_GRADOS).precision(0.3);
     this.path = geoPath(this.proyeccion);
@@ -204,24 +213,38 @@ export class Mapa2D {
   #crearZoom() {
     this.zoom = d3zoom()
       .scaleExtent([1, ZOOM_MAX])
-      .filter((e) => (!e.ctrlKey || e.type === 'wheel') && !e.button)
+      // Un dedo apoyado fuera del mapa (en el panel, por ejemplo) no debe
+      // convertir el arrastre en un pellizco.
+      .filter((e) => (!e.ctrlKey || e.type === 'wheel') && !e.button
+        && (!e.touches || [...e.touches].every((t) => this.svg.contains(t.target))))
+      // Mientras el mapa se mueve quitamos las sombras (filtros SVG caros de repintar)
+      .on('start', () => this.svg.classList.add('moviendo'))
+      .on('end', () => this.svg.classList.remove('moviendo'))
       .on('zoom', (e) => {
+        // Si el niño mueve el mapa, ya no hay que volver a encuadrarlo solo
+        if (e.sourceEvent) this.encuadre = null;
         this.transform = e.transform;
         this.gZoom.setAttribute('transform', e.transform.toString());
         this.#ubicarRotulos();
+        this.alZoom.forEach((f) => f(e.transform));
       });
     this.sel.call(this.zoom).on('dblclick.zoom', null);
   }
 
   // Toque/clic con Pointer Events: distinguimos un toque de un arrastre.
+  // Solo cuentan los dedos apoyados sobre el mapa (no los del resto de la pantalla).
   #crearInteraccion() {
     let inicio = null;
+    const dedos = new Set();
     this.svg.addEventListener('pointerdown', (e) => {
-      if (!e.isPrimary) { inicio = null; return; }
-      inicio = { x: e.clientX, y: e.clientY, t: performance.now() };
+      dedos.add(e.pointerId);
+      // Clic derecho o central: no es un toque
+      if (e.button !== 0 || dedos.size > 1) { inicio = null; return; }
+      inicio = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
     });
     this.svg.addEventListener('pointerup', (e) => {
-      if (!inicio || !e.isPrimary) return;
+      dedos.delete(e.pointerId);
+      if (!inicio || e.pointerId !== inicio.id) return;
       const dx = e.clientX - inicio.x, dy = e.clientY - inicio.y;
       const rapido = performance.now() - inicio.t < 600;
       inicio = null;
@@ -230,7 +253,12 @@ export class Mapa2D {
       if (objetivo && this.svg.contains(objetivo)) this.alSeleccionar(objetivo.dataset.id, { origen: 'toque' });
       else this.alTocarFondo();
     });
-    this.svg.addEventListener('pointercancel', () => { inicio = null; });
+    const soltar = (e) => {
+      dedos.delete(e.pointerId);
+      if (inicio?.id === e.pointerId) inicio = null;
+    };
+    this.svg.addEventListener('pointercancel', soltar);
+    this.svg.addEventListener('lostpointercapture', soltar);
     this.svg.addEventListener('keydown', (e) => {
       const id = e.target?.dataset?.id;
       if (id && (e.key === 'Enter' || e.key === ' ')) {
@@ -251,6 +279,10 @@ export class Mapa2D {
   redimensionar() {
     const { width: w, height: h } = this.cont.getBoundingClientRect();
     if (!w || !h) return;
+    // Punto geográfico que estaba al centro de la vista (para no perderlo al girar el equipo)
+    const antes = this.ancho ? { w: this.ancho, h: this.alto, k: this.transform.k } : null;
+    const centroGeo = antes ? this.proyeccion.invert(this.transform.invert([antes.w / 2, antes.h / 2])) : null;
+    const pulsaba = !!this.gElevado.firstChild?.classList.contains('pulsa');
     this.ancho = w;
     this.alto = h;
     this.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
@@ -260,7 +292,24 @@ export class Mapa2D {
     this.radioDisco = radioDisco;
     this.zoom.extent([[0, 0], [w, h]]).translateExtent([[-w * 0.3, -h * 0.3], [w * 1.3, h * 1.3]]);
     this.#dibujar();
-    if (this.seleccionado) this.#elevar(this.seleccionado);
+    if (this.seleccionado) {
+      this.#elevar(this.seleccionado);
+      if (pulsaba) this.gElevado.firstChild?.classList.add('pulsa');
+    }
+    if (antes && (antes.w !== w || antes.h !== h)) this.#reencuadrar(centroGeo, antes.k);
+    this.alRedimensionar.forEach((f) => f());
+  }
+
+  // Tras girar el equipo o cambiar el tamaño: si la vista la puso el juego
+  // (centrar o enfocar un país), se vuelve a calcular; si la movió el niño,
+  // se conserva el mismo punto al centro.
+  #reencuadrar(centroGeo, k) {
+    if (this.encuadre?.id) { this.enfocar(this.encuadre.id, { instante: true }); return; }
+    if (this.encuadre) { this.#centrar(true); return; }
+    const p = centroGeo && this.proyeccion(centroGeo);
+    if (!p) return;
+    const t = zoomIdentity.translate(this.ancho / 2, this.alto / 2).scale(k).translate(-p[0], -p[1]);
+    this.sel.interrupt().call(this.zoom.transform, t);
   }
 
   #dibujar() {
@@ -283,21 +332,27 @@ export class Mapa2D {
   #ubicarRotulos() {
     const t = this.transform;
     const k = t.k;
+    // Los nombres de las capitales aparecen al acercarse
+    if ((k >= 2.4) !== this.svg.classList.contains('zoom-cerca')) this.svg.classList.toggle('zoom-cerca', k >= 2.4);
     for (const r of this.rotulos) {
       if (!r.xy) continue;
       const x = t.applyX(r.xy[0]), y = t.applyY(r.xy[1]);
       r.el.setAttribute('transform', `translate(${x.toFixed(1)},${y.toFixed(1)})${r.giro ? ` rotate(${r.giro})` : ''}`);
-      const oculto = (r.zoomMin && k < r.zoomMin) || this.#ocultoPorOpcion(r, k);
+      const oculto = (r.zoomMin && k < r.zoomMin) || this.#ocultoPorOpcion(r);
       r.el.classList.toggle('oculto', !!oculto);
     }
   }
 
-  #ocultoPorOpcion(r, k) {
+  #ocultoPorOpcion(r) {
     const o = this.opciones;
     if (r.tipo === 'ecuador') return !o.ecuador;
     if (r.tipo === 'tropico') return !o.tropico;
-    if (r.tipo === 'pais') return !o.nombres && !this.visitados.has(r.pais);
+    if (r.tipo === 'pais') {
+      if (this.juego?.nombres) return !this.juego.nombres(r.pais);
+      return !o.nombres && !this.visitados.has(r.pais);
+    }
     if (r.tipo === 'capital') {
+      if (this.juego && !this.juego.capitales) return true;
       if (!o.capitales) return r.pais !== this.seleccionado;
       return false;
     }
@@ -306,7 +361,7 @@ export class Mapa2D {
 
   #aplicarOpciones() {
     const o = this.opciones;
-    this.svg.classList.toggle('sin-nombres', !o.nombres);
+    this.svg.classList.toggle('sin-nombres', !o.nombres && !this.juego?.nombres);
     this.svg.classList.toggle('con-ecuador', o.ecuador);
     this.svg.classList.toggle('con-tropico', o.tropico);
     // Nombres de capitales: solo con zoom o en el país elegido
@@ -353,35 +408,158 @@ export class Mapa2D {
     );
   }
 
-  enfocar(id) {
+  enfocar(id, { instante = false } = {}) {
     const item = this.pathsPais.get(id);
     if (!item) return;
+    this.encuadre = { id };
     const [[x0, y0], [x1, y1]] = this.path.bounds(item.principal);
-    this.#irA(x0, y0, x1, y1, id === 'brasil' || id === 'argentina' ? 0.8 : 0.62);
+    this.#irA(x0, y0, x1, y1, id === 'brasil' || id === 'argentina' ? 0.8 : 0.62, instante);
   }
 
-  #irA(x0, y0, x1, y1, relleno = 0.65) {
+  #irA(x0, y0, x1, y1, relleno = 0.65, instante = false) {
     const m = this.margenes();
-    const anchoUtil = this.ancho - m.left - m.right;
-    const altoUtil = this.alto - m.top - m.bottom;
+    // En pantallas muy bajas la hoja puede tapar casi todo: dejamos al menos un 30 % útil
+    const anchoUtil = Math.max(this.ancho * 0.3, this.ancho - m.left - m.right);
+    const altoUtil = Math.max(this.alto * 0.3, this.alto - m.top - m.bottom);
     const k = Math.min(ZOOM_MAX, Math.max(1, relleno / Math.max((x1 - x0) / anchoUtil, (y1 - y0) / altoUtil)));
     const cx = m.left + anchoUtil / 2, cy = m.top + altoUtil / 2;
     const destino = zoomIdentity.translate(cx, cy).scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
-    this.sel.interrupt().transition().duration(reduceMovimiento() ? 0 : 950).call(this.zoom.transform, destino);
+    if (instante) this.sel.interrupt().call(this.zoom.transform, destino);
+    else this.sel.interrupt().transition().duration(reduceMovimiento() ? 0 : 950).call(this.zoom.transform, destino);
   }
 
   /** Vuelve a la vista completa de Sudamérica. */
   centrar() {
+    this.#centrar(false);
+  }
+
+  #centrar(instante) {
+    this.encuadre = { centro: true };
     const m = this.margenes();
     // Encuadre de Sudamérica continental
     const sa = { type: 'Feature', geometry: { type: 'MultiPoint', coordinates: [[-81.5, 12.5], [-34.8, -7], [-68, -55.9], [-73, -50]] } };
     const [[x0, y0], [x1, y1]] = this.path.bounds(sa);
-    if (m.hoja) this.#irA(x0, y0, x1, y1, 0.92);
+    if (m.hoja) this.#irA(x0, y0, x1, y1, 0.92, instante);
+    else if (instante) this.sel.interrupt().call(this.zoom.transform, zoomIdentity);
     else this.sel.interrupt().transition().duration(reduceMovimiento() ? 0 : 800).call(this.zoom.transform, zoomIdentity);
   }
 
   acercar(factor) {
+    this.encuadre = null;
     this.sel.interrupt().transition().duration(reduceMovimiento() ? 0 : 300).call(this.zoom.scaleBy, factor);
+  }
+
+  /** Configura qué se muestra durante un juego (null = modo explorar). */
+  setJuego(cfg) {
+    this.juego = cfg;
+    this.#aplicarOpciones();
+    this.#ubicarRotulos();
+  }
+
+  refrescarRotulos() {
+    this.#ubicarRotulos();
+  }
+
+  /** Agrega un elemento a la capa de rótulos que sigue al mapa sin escalarse. */
+  agregarRotulo(el, lon, lat, { capa = 'superior', giro = 0 } = {}) {
+    (capa === 'superior' ? this.gSuperior : this.gRotulos).append(el);
+    const r = { el, lon, lat, giro, xy: this.proyeccion([lon, lat]) };
+    this.rotulos.push(r);
+    this.#ubicarRotulos();
+    return r;
+  }
+
+  quitarRotulo(el) {
+    this.rotulos = this.rotulos.filter((r) => r.el !== el);
+    el.remove();
+  }
+
+  /** Punto donde va el nombre del país (sirve para marcadores). */
+  puntoDe(id) {
+    const d = PAISES_POR_ID[id] ?? (id === GUAYANA_FRANCESA.id ? GUAYANA_FRANCESA : null);
+    return d ? [d.etiqueta.lon, d.etiqueta.lat] : null;
+  }
+
+  /** Globo amarillo con "?" que apunta a un país (o null para quitarlo). */
+  marcador(id) {
+    if (this.elMarcador) this.quitarRotulo(this.elMarcador);
+    this.elMarcador = null;
+    if (!id) return;
+    const g = document.createElementNS(NS, 'g');
+    g.setAttribute('class', 'marcador-pregunta');
+    g.innerHTML = `<g class="marcador-flota">
+      <path d="M0 0 C-4 -10 -18 -20 -18 -34 A18 18 0 1 1 18 -34 C18 -20 4 -10 0 0Z" fill="#F2C230" stroke="#23302A" stroke-width="2.5"/>
+      <text x="0" y="-26" text-anchor="middle" font-size="24" font-weight="900" fill="#23302A">?</text></g>`;
+    const [lon, lat] = this.puntoDe(id);
+    this.elMarcador = g;
+    this.agregarRotulo(g, lon, lat);
+  }
+
+  #clon(id, clase) {
+    const item = this.pathsPais.get(id);
+    if (!item) return null;
+    const p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', item.p.getAttribute('d'));
+    p.setAttribute('class', clase);
+    p.dataset.id = id;
+    const [[x0, y0], [x1, y1]] = this.path.bounds(item.principal);
+    p.style.transformOrigin = `${(x0 + x1) / 2}px ${(y0 + y1) / 2}px`;
+    return { p, item };
+  }
+
+  /** El país salta (acierto). */
+  animarAcierto(id) {
+    const c = this.#clon(id, 'pais-salta');
+    if (!c) return;
+    c.p.style.fill = c.item.p.style.fill;
+    c.p.setAttribute('filter', 'url(#sombra-pais)');
+    this.gEfectos.append(c.p);
+    const k = this.transform.k;
+    if (reduceMovimiento()) { setTimeout(() => c.p.remove(), 900); return; }
+    c.p.animate([
+      { transform: 'translate(0,0) scale(1)' },
+      { transform: `translate(0,${-14 / k}px) scale(1.12)`, offset: 0.35 },
+      { transform: 'translate(0,0) scale(0.97)', offset: 0.65 },
+      { transform: `translate(0,${-5 / k}px) scale(1.04)`, offset: 0.82 },
+      { transform: 'translate(0,0) scale(1)' },
+    ], { duration: 850, easing: 'ease-out' }).onfinish = () => c.p.remove();
+  }
+
+  /** El país tocado tiembla en rojo con una ✗ (no depende solo del color). */
+  animarError(id) {
+    const c = this.#clon(id, 'pais-error');
+    if (!c) return;
+    this.gEfectos.append(c.p);
+    const pt = this.puntoDe(id);
+    const x = document.createElementNS(NS, 'g');
+    x.setAttribute('class', 'marca-error');
+    x.innerHTML = '<circle r="14"/><path d="M-5.5 -5.5 5.5 5.5M5.5 -5.5 -5.5 5.5"/>';
+    if (pt) this.agregarRotulo(x, pt[0], pt[1]);
+    const k = this.transform.k;
+    const fin = () => { c.p.remove(); if (pt) this.quitarRotulo(x); };
+    if (reduceMovimiento()) { setTimeout(fin, 1000); return; }
+    const d = 6 / k;
+    c.p.animate([
+      { transform: 'translateX(0)' }, { transform: `translateX(${-d}px)` }, { transform: `translateX(${d}px)` },
+      { transform: `translateX(${-d}px)` }, { transform: `translateX(${d * 0.6}px)` }, { transform: 'translateX(0)' },
+    ], { duration: 520, easing: 'ease-in-out' });
+    c.p.animate([{ opacity: 1 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }], { duration: 1100 }).onfinish = fin;
+  }
+
+  /** Resalta el país bajo una bandera que se arrastra. */
+  resaltar(id) {
+    for (const [pid, { p }] of this.pathsPais) p.classList.toggle('objetivo', pid === id);
+  }
+
+  /** Muestra la respuesta: el país late con un borde grueso. */
+  mostrarRespuesta(id) {
+    this.seleccionar(id, { zoom: false });
+    this.gElevado.firstChild?.classList.add('pulsa');
+  }
+
+  /** Proyección [lon, lat] → coordenadas del mapa sin zoom. */
+  proyectar(lon, lat) {
+    return this.proyeccion([lon, lat]);
   }
 
   /** Proyección [lon, lat] → coordenadas de pantalla dentro del contenedor. */
